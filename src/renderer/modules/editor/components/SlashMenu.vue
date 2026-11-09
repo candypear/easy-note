@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, type PropType } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type PropType } from 'vue'
 import type { Editor } from '@tiptap/core'
 import Icon from '../../../ui/icons/Icon.vue'
+import SlashPreview from './SlashPreview.vue'
 
 const props = defineProps({
   editor: { type: Object as PropType<Editor | null>, default: null },
@@ -57,6 +58,10 @@ const items: Item[] = [
 
 const active = ref(0)
 
+const MENU_WIDTH = 280
+const PREVIEW_WIDTH = 248
+const PREVIEW_HEIGHT = 170
+
 const filtered = computed(() => {
   const query = props.query.trim().toLowerCase()
   if (!query) return items
@@ -67,7 +72,39 @@ const menuHeight = computed(() =>
   Math.min(filtered.value.length * 32 + 10, 400, window.innerHeight - 16)
 )
 const top = computed(() => Math.max(8, Math.min(props.y, window.innerHeight - menuHeight.value - 8)))
-const left = computed(() => Math.max(8, Math.min(props.x, window.innerWidth - 296)))
+const left = computed(() => Math.max(8, Math.min(props.x, window.innerWidth - MENU_WIDTH - 16)))
+
+const activeItem = computed(() => filtered.value[active.value])
+const menuRef = ref<HTMLElement | null>(null)
+const previewTop = ref(0)
+
+const previewLeft = computed(() => {
+  const right = left.value + MENU_WIDTH + 8
+  if (right + PREVIEW_WIDTH <= window.innerWidth - 8) return right
+  const flipped = left.value - PREVIEW_WIDTH - 8
+  if (flipped >= 8) return flipped
+  return Math.max(8, window.innerWidth - PREVIEW_WIDTH - 8)
+})
+
+async function syncPreviewTop(): Promise<void> {
+  previewTop.value = Math.max(
+    8,
+    Math.min(top.value + 5 + active.value * 32, window.innerHeight - PREVIEW_HEIGHT - 8)
+  )
+  await nextTick()
+  const item = menuRef.value?.querySelector<HTMLElement>('.slash-item.active')
+  if (!item) return
+  previewTop.value = Math.max(
+    8,
+    Math.min(item.getBoundingClientRect().top, window.innerHeight - PREVIEW_HEIGHT - 8)
+  )
+}
+
+watch([() => props.open, active, top, filtered], () => void syncPreviewTop(), { immediate: true })
+
+watch(filtered, () => {
+  if (active.value >= filtered.value.length) active.value = 0
+})
 
 function select(item: Item): void {
   if (!props.editor) return
@@ -105,7 +142,14 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown, true))
 
 <template>
   <Teleport to="body">
-    <div v-if="props.open" class="slash-menu no-drag" :style="{ left: `${left}px`, top: `${top}px` }" role="menu">
+    <div
+      v-if="props.open"
+      ref="menuRef"
+      class="slash-menu no-drag"
+      :style="{ left: `${left}px`, top: `${top}px` }"
+      role="menu"
+      @scroll="syncPreviewTop"
+    >
       <button
         v-for="(item, index) in filtered"
         :key="item.id"
@@ -120,6 +164,13 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown, true))
         <span class="category">{{ item.category }}</span>
       </button>
     </div>
+    <SlashPreview
+      v-if="props.open && activeItem"
+      :item-id="activeItem.id"
+      :label="activeItem.label"
+      :left="previewLeft"
+      :top="previewTop"
+    />
   </Teleport>
 </template>
 
