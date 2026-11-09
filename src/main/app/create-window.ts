@@ -1,4 +1,4 @@
-import { BrowserWindow, nativeTheme } from 'electron'
+import { BrowserWindow, Menu, MenuItem, nativeTheme } from 'electron'
 import { join } from 'node:path'
 import type { MainContext } from '@main/bootstrap/types'
 import { readWindowState, writeWindowState } from './window-state'
@@ -58,6 +58,27 @@ export function createMainWindow(ctx: MainContext): BrowserWindow {
   })
   window.webContents.on('did-fail-load', (_event, code, description) => {
     console.error('[renderer] load failed', code, description)
+  })
+
+  window.webContents.on('context-menu', (_event, params) => {
+    const flags = params.editFlags
+    const hasSelection = params.selectionText.trim().length > 0
+    if (!params.isEditable && !hasSelection) return
+
+    const menu = new Menu()
+    if (params.isEditable) {
+      menu.append(new MenuItem({ label: '撤销', role: 'undo', enabled: flags.canUndo }))
+      menu.append(new MenuItem({ label: '重做', role: 'redo', enabled: flags.canRedo }))
+      menu.append(new MenuItem({ type: 'separator' }))
+      menu.append(new MenuItem({ label: '剪切', role: 'cut', enabled: flags.canCut }))
+    }
+    menu.append(new MenuItem({ label: '复制', role: 'copy', enabled: flags.canCopy }))
+    if (params.isEditable) {
+      menu.append(new MenuItem({ label: '粘贴', role: 'paste', enabled: flags.canPaste }))
+      menu.append(new MenuItem({ type: 'separator' }))
+    }
+    menu.append(new MenuItem({ label: '全选', role: 'selectAll', enabled: flags.canSelectAll }))
+    menu.popup({ window })
   })
 
   window.on('resize', schedule)

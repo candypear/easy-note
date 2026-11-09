@@ -92,7 +92,7 @@ export function buildExtensions(placeholder: string): Extensions {
     Placeholder.configure({ placeholder }),
     TaskList,
     TaskItem.configure({ nested: true }),
-    Table.configure({ resizable: false }),
+    Table.configure({ resizable: false, allowTableNodeSelection: true }),
     TableRow,
     TableHeader,
     TableCell,

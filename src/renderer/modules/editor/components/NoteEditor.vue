@@ -3,9 +3,12 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { EditorContent } from '@tiptap/vue-3'
 import type { Editor } from '@tiptap/vue-3'
 import type { Node as PMNode } from '@tiptap/pm/model'
+import { NodeSelection, TextSelection } from '@tiptap/pm/state'
 import { asNoteId } from '@shared/types/brand'
 import { useContext } from '../../../app/providers'
 import BaseButton from '../../../ui/button/BaseButton.vue'
+import BaseDialog from '../../../ui/dialog/BaseDialog.vue'
+import BaseInput from '../../../ui/input/BaseInput.vue'
 import BaseMenu, { type MenuItem } from '../../../ui/menu/BaseMenu.vue'
 import Icon from '../../../ui/icons/Icon.vue'
 import { toast } from '../../../ui'
@@ -40,7 +43,15 @@ const wiki = ref({
   mode: 'wiki' as 'wiki' | 'embed'
 })
 const handle = ref<{ top: number; left: number; pos: number } | null>(null)
-const blockMenu = ref({ open: false, x: 0, y: 0, pos: 0 })
+const contextMenu = ref({
+  open: false,
+  kind: 'block' as 'block' | 'table',
+  x: 0,
+  y: 0,
+  pos: 0,
+  cellPos: null as number | null
+})
+const tableSize = ref({ open: false, rows: '3', cols: '3', tablePos: 0 })
 
 let currentId: string | null = null
 let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -166,6 +177,71 @@ function blockAt(instance: Editor, pos: number): PMNode | null {
   return doc.nodeAt(pos)
 }
 
+function topLevelElement(root: HTMLElement, target: Element): Element | null {
+  let el: Element | null = target
+  while (el && el.parentElement !== root) el = el.parentElement
+  return el === root ? null : el
+}
+
+function blockPosForElement(instance: Editor, el: Element): number | null {
+  let pos: number
+  try {
+    pos = instance.view.posAtDOM(el, 0)
+  } catch {
+    return null
+  }
+  const doc = instance.state.doc
+  if (pos < 0 || pos > doc.content.size) return null
+  const $pos = doc.resolve(pos)
+  if ($pos.depth > 0) pos = $pos.before(1)
+  return doc.nodeAt(pos) ? pos : null
+}
+
+function blockPosAt(instance: Editor, target: Element): number | null {
+  const root = instance.view.dom
+  if (target === root || !root.contains(target)) return null
+  const el = topLevelElement(root, target)
+  if (!el) return null
+  return blockPosForElement(instance, el)
+}
+
+function tableContextAt(
+  instance: Editor,
+  target: Element
+): { tablePos: number; cellPos: number } | null {
+  const cell = target.closest('td, th')
+  if (!(cell instanceof HTMLElement) || !instance.view.dom.contains(cell)) return null
+  let cellPos: number
+  try {
+    cellPos = instance.view.posAtDOM(cell, 0)
+  } catch {
+    return null
+  }
+  const $cell = instance.state.doc.resolve(cellPos)
+  for (let depth = $cell.depth; depth > 0; depth -= 1) {
+    if ($cell.node(depth).type.name === 'table') {
+      return { tablePos: $cell.before(depth), cellPos }
+    }
+  }
+  return null
+}
+
+function tableDimensions(table: PMNode): { rows: number; cols: number } {
+  let cols = 0
+  table.forEach((row) => {
+    cols = Math.max(cols, row.childCount)
+  })
+  return { rows: table.childCount, cols }
+}
+
+function focusCell(instance: Editor, cellPos: number): boolean {
+  const doc = instance.state.doc
+  if (cellPos < 0 || cellPos > doc.content.size) return false
+  instance.view.dispatch(instance.state.tr.setSelection(TextSelection.near(doc.resolve(cellPos))))
+  instance.view.focus()
+  return true
+}
+
 function flashBlock(pos: number): void {
   const instance = editor.value
   if (!instance) return
@@ -280,38 +356,102 @@ function onMouseMove(event: MouseEvent): void {
   const root = instance.view.dom
   if (target === root || !root.contains(target)) return
 
-  let el: Element | null = target
-  while (el && el.parentElement !== root) el = el.parentElement
-  if (!el || el === root) return
-
-  let pos: number
-  try {
-    pos = instance.view.posAtDOM(el, 0)
-  } catch {
-    return
-  }
-  if (!blockAt(instance, pos)) return
+  const el = topLevelElement(root, target)
+  if (!el) return
+  const pos = blockPosForElement(instance, el)
+  if (pos === null) return
   if (handle.value?.pos === pos) return
 
   const rect = el.getBoundingClientRect()
   handle.value = { top: rect.top, left: rect.left - 30, pos }
 }
 
-function openBlockMenu(): void {
+function selectBlock(pos: number): void {
+  const instance = editor.value
+  if (!instance) return
+  const doc = instance.state.doc
+  if (!doc.nodeAt(pos)) return
+  instance.view.dispatch(instance.state.tr.setSelection(NodeSelection.create(doc, pos)))
+  instance.view.focus()
+}
+
+function onHandleClick(): void {
   if (!handle.value) return
-  blockMenu.value = {
-    open: true,
-    x: handle.value.left,
-    y: handle.value.top,
-    pos: handle.value.pos
+  selectBlock(handle.value.pos)
+}
+
+function onEditorContextMenu(event: MouseEvent): void {
+  const instance = editor.value
+  if (!instance || ctx.workspace.sourceMode) return
+  const target = event.target
+  if (!(target instanceof Element)) return
+  const root = instance.view.dom
+  if (!root.contains(target)) return
+
+  const table = tableContextAt(instance, target)
+  const blockPos = blockPosAt(instance, target)
+  const selection = instance.state.selection
+
+  if (blockPos !== null && selection instanceof NodeSelection && selection.from === blockPos) {
+    event.preventDefault()
+    contextMenu.value = {
+      open: true,
+      kind: 'block',
+      x: event.clientX,
+      y: event.clientY,
+      pos: blockPos,
+      cellPos: table?.cellPos ?? null
+    }
+    return
+  }
+
+  if (table) {
+    event.preventDefault()
+    contextMenu.value = {
+      open: true,
+      kind: 'table',
+      x: event.clientX,
+      y: event.clientY,
+      pos: table.tablePos,
+      cellPos: table.cellPos
+    }
   }
 }
 
-const blockMenuItems = computed<MenuItem[]>(() => {
+function tableInsertItems(): MenuItem[] {
+  return [
+    { id: 'table:rowBefore', label: t('editor.rowBefore'), icon: 'arrowUp' },
+    { id: 'table:rowAfter', label: t('editor.rowAfter'), icon: 'arrowDown' },
+    { id: 'table:colBefore', label: t('editor.colBefore'), icon: 'chevronLeft' },
+    { id: 'table:colAfter', label: t('editor.colAfter'), icon: 'chevronRight' }
+  ]
+}
+
+const menuItems = computed<MenuItem[]>(() => {
   const instance = editor.value
-  const node = instance ? blockAt(instance, blockMenu.value.pos) : null
-  const items: MenuItem[] = [
-    {
+  const menu = contextMenu.value
+
+  if (menu.kind === 'table') {
+    return [
+      ...tableInsertItems(),
+      { id: 'tableSep', label: '', separator: true },
+      { id: 'table:size', label: t('editor.tableSize'), icon: 'table' },
+      { id: 'tableSep2', label: '', separator: true },
+      { id: 'table:delete', label: t('editor.deleteTable'), icon: 'trash', danger: true }
+    ]
+  }
+
+  const node = instance ? blockAt(instance, menu.pos) : null
+  const items: MenuItem[] = []
+
+  if (node?.type.name === 'table') {
+    if (menu.cellPos !== null) items.push(...tableInsertItems())
+    items.push(
+      { id: 'table:size', label: t('editor.tableSize'), icon: 'table' },
+      { id: 'tableSep', label: '', separator: true }
+    )
+  } else {
+    items.push({
       id: 'convert',
       label: t('editor.convertTo'),
       children: [
@@ -325,9 +465,10 @@ const blockMenuItems = computed<MenuItem[]>(() => {
         { id: 'convert:code', label: '代码块', icon: 'code' },
         { id: 'convert:math', label: '公式块', icon: 'math' }
       ]
-    },
-    { id: 'insertBelow', label: t('editor.insertBelow') }
-  ]
+    })
+  }
+
+  items.push({ id: 'insertBelow', label: t('editor.insertBelow') })
   if (node?.type.name === 'codeBlock') {
     items.push({
       id: 'collapse',
@@ -391,11 +532,100 @@ function convertBlock(pos: number, kind: string): void {
   else if (kind === 'quote') chain.toggleBlockquote().run()
 }
 
-async function onBlockMenuSelect(id: string): Promise<void> {
-  const pos = blockMenu.value.pos
-  blockMenu.value.open = false
+function clampTableCount(value: string): number {
+  const parsed = Number.parseInt(value, 10)
+  if (!Number.isFinite(parsed)) return 1
+  return Math.min(50, Math.max(1, parsed))
+}
+
+function openTableSize(tablePos: number): void {
   const instance = editor.value
   if (!instance) return
+  const table = blockAt(instance, tablePos)
+  if (!table || table.type.name !== 'table') return
+  const { rows, cols } = tableDimensions(table)
+  tableSize.value = { open: true, rows: String(rows), cols: String(cols), tablePos }
+}
+
+function resizeTable(instance: Editor, tablePos: number, rows: number, cols: number): void {
+  const table = blockAt(instance, tablePos)
+  if (!table || table.type.name !== 'table') return
+  const schema = instance.state.schema
+  const cellType = schema.nodes.tableCell
+  const headerType = schema.nodes.tableHeader
+  if (!cellType || !headerType) return
+
+  const nextRows: PMNode[] = []
+  for (let r = 0; r < rows; r += 1) {
+    const source = r < table.childCount ? table.child(r) : null
+    const template = source ?? table.child(table.childCount - 1)
+    const header = template.child(0)?.type.name === 'tableHeader'
+    const cells: PMNode[] = []
+    for (let c = 0; c < cols; c += 1) {
+      const existing = source && c < source.childCount ? source.child(c) : null
+      cells.push(existing ?? (header ? headerType : cellType).createAndFill()!)
+    }
+    nextRows.push(template.type.create(source?.attrs ?? template.attrs, cells))
+  }
+
+  const nextTable = table.type.create(table.attrs, nextRows)
+  const tr = instance.state.tr.replaceWith(tablePos, tablePos + table.nodeSize, nextTable)
+  tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(tablePos + 2, tr.doc.content.size))))
+  instance.view.dispatch(tr.scrollIntoView())
+  instance.view.focus()
+}
+
+function applyTableSize(): void {
+  const instance = editor.value
+  if (!instance) return
+  const { tablePos } = tableSize.value
+  const rows = clampTableCount(tableSize.value.rows)
+  const cols = clampTableCount(tableSize.value.cols)
+  tableSize.value.open = false
+  resizeTable(instance, tablePos, rows, cols)
+}
+
+function runTableAction(
+  instance: Editor,
+  action: string,
+  tablePos: number,
+  cellPos: number | null
+): void {
+  if (action === 'size') {
+    openTableSize(tablePos)
+    return
+  }
+  if (action === 'delete') {
+    const table = blockAt(instance, tablePos)
+    if (!table || table.type.name !== 'table') return
+    instance
+      .chain()
+      .focus()
+      .deleteRange({ from: tablePos, to: tablePos + table.nodeSize })
+      .run()
+    return
+  }
+  if (cellPos === null) return
+  if (!focusCell(instance, cellPos)) return
+  const chain = instance.chain().focus()
+  if (action === 'rowBefore') chain.addRowBefore().run()
+  else if (action === 'rowAfter') chain.addRowAfter().run()
+  else if (action === 'colBefore') chain.addColumnBefore().run()
+  else if (action === 'colAfter') chain.addColumnAfter().run()
+}
+
+async function onMenuSelect(id: string): Promise<void> {
+  const menu = contextMenu.value
+  contextMenu.value.open = false
+  const instance = editor.value
+  if (!instance) return
+
+  if (id.startsWith('table:')) {
+    runTableAction(instance, id.slice('table:'.length), menu.pos, menu.cellPos)
+    return
+  }
+
+  const pos = menu.pos
   const node = blockAt(instance, pos)
   if (!node) return
 
@@ -542,7 +772,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="note-editor" @mousemove="onMouseMove" @mouseleave="handle = null">
+  <div
+    class="note-editor"
+    @mousemove="onMouseMove"
+    @mouseleave="handle = null"
+    @contextmenu="onEditorContextMenu"
+  >
     <FindBar :editor="editor" :open="findOpen" @close="findOpen = false" />
     <ExternalChangeBanner
       :visible="external"
@@ -578,11 +813,11 @@ onBeforeUnmount(() => {
       v-if="handle && !ctx.workspace.sourceMode && !isEmpty"
       class="block-handle no-drag"
       type="button"
-      aria-label="块菜单"
+      aria-label="选择块"
       :style="{ top: `${handle.top}px`, left: `${handle.left}px` }"
-      @mousedown.prevent="openBlockMenu"
+      @mousedown.prevent="onHandleClick"
     >
-      <Icon name="dots" :size="14" />
+      <Icon name="grip" :size="16" />
     </button>
 
     <SlashMenu
@@ -607,13 +842,39 @@ onBeforeUnmount(() => {
     />
 
     <BaseMenu
-      :open="blockMenu.open"
-      :x="blockMenu.x"
-      :y="blockMenu.y"
-      :items="blockMenuItems"
-      @select="onBlockMenuSelect"
-      @close="blockMenu.open = false"
+      :open="contextMenu.open"
+      :x="contextMenu.x"
+      :y="contextMenu.y"
+      :items="menuItems"
+      @select="onMenuSelect"
+      @close="contextMenu.open = false"
     />
+
+    <BaseDialog
+      :open="tableSize.open"
+      :title="t('editor.tableSizeTitle')"
+      :width="300"
+      @close="tableSize.open = false"
+    >
+      <div class="table-size">
+        <label class="table-size-field">
+          <span>{{ t('editor.rows') }}</span>
+          <BaseInput v-model="tableSize.rows" size="sm" />
+        </label>
+        <label class="table-size-field">
+          <span>{{ t('editor.columns') }}</span>
+          <BaseInput v-model="tableSize.cols" size="sm" />
+        </label>
+      </div>
+      <template #footer>
+        <BaseButton variant="ghost" size="sm" @click="tableSize.open = false">
+          {{ t('menu.cancel') }}
+        </BaseButton>
+        <BaseButton variant="primary" size="sm" @click="applyTableSize">
+          {{ t('editor.apply') }}
+        </BaseButton>
+      </template>
+    </BaseDialog>
   </div>
 </template>
 
@@ -697,5 +958,23 @@ onBeforeUnmount(() => {
 .block-handle:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.table-size {
+  display: flex;
+  gap: 12px;
+}
+
+.table-size-field {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.table-size-field :deep(.base-input) {
+  flex: 1;
 }
 </style>
