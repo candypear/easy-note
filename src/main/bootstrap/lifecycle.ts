@@ -186,9 +186,23 @@ async function runSmoke(ctx: ReturnType<typeof createContext>, window: BrowserWi
         window.dispatchEvent(new KeyboardEvent('keydown', { key: 'e', ctrlKey: true, bubbles: true }))
         await wait(350)
         const wysiwyg = Boolean(document.querySelector('.ProseMirror'))
+        const searchTab = [...document.querySelectorAll('.sidebar .tab')]
+          .find((tab) => tab.textContent?.includes('搜索'))
+        searchTab?.click()
+        await wait(200)
+        const input = document.querySelector('.search-view input')
+        if (input) {
+          input.value = 'answer'
+          input.dispatchEvent(new Event('input', { bubbles: true }))
+        }
+        await wait(500)
+        const searchResults = document.querySelectorAll('.search-view .result').length
+        document.querySelector('.search-view .result')?.click()
+        await wait(450)
+        const revealed = Boolean(document.querySelector('.block-flash'))
         return {
           settings, settingsClosed, quickSwitch, tags, tagRows, search, graph, backToEditor,
-          sourceMode, wysiwyg
+          sourceMode, wysiwyg, searchResults, revealed
         }
       })()`)
     }

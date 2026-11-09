@@ -1,8 +1,9 @@
-import type { NoteId } from '../types/brand'
+import type { BlockId, NoteId } from '../types/brand'
 import type { IpcResult } from './envelope'
 
 export interface SearchHit {
   noteId: NoteId
+  blockId: BlockId | null
   title: string
   path: string
   snippet: string

@@ -40,7 +40,7 @@ watch(query, (value) => {
 })
 
 function open(hit: SearchHit): void {
-  ctx.workspace.openNote(hit.noteId)
+  ctx.workspace.openNote(hit.noteId, hit.blockId ? { blockId: hit.blockId } : undefined)
   void ctx.api.settings.addRecent(asNoteId(hit.noteId))
 }
 

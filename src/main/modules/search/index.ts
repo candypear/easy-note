@@ -2,7 +2,7 @@ import type { MainContext, MainModule } from '@main/bootstrap/types'
 import type { QuickSwitchHit, SearchHit } from '@shared/contracts/search'
 import { SearchChannels } from '@shared/contracts/search'
 import type { NoteSummary } from '@shared/contracts/note'
-import type { NoteId } from '@shared/types/brand'
+import type { BlockId, NoteId } from '@shared/types/brand'
 import { asNoteId } from '@shared/types/brand'
 import { AppError } from '@main/platform/errors'
 import { escapeLike } from '@main/platform/sql-like'
@@ -125,12 +125,21 @@ export class SearchService {
       [...new Set(raw.map((row) => asNoteId(row.note_id)))]
     )
     const byId = new Map(notes.map((note) => [note.id, note]))
+    const needle = trimmed.toLowerCase()
+    const blockIds = new Map<NoteId, BlockId | null>()
+    for (const id of byId.keys()) {
+      const hit = this.ctx.services.block
+        .listByNote(id)
+        .find((block) => block.plainText.toLowerCase().includes(needle))
+      blockIds.set(id, hit?.id ?? null)
+    }
     return raw
       .map((row) => {
         const note = byId.get(asNoteId(row.note_id))
         if (!note) return null
         return {
           noteId: note.id,
+          blockId: blockIds.get(note.id) ?? null,
           title: note.title,
           path: note.path,
           snippet: row.snippet,

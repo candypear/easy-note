@@ -105,6 +105,8 @@ child.on('exit', (code) => {
   if (ui.backToEditor !== true) failures.push('did not return to editor')
   if (ui.sourceMode !== true) failures.push('source mode did not open')
   if (ui.wysiwyg !== true) failures.push('did not return from source mode')
+  if (!(ui.searchResults >= 1)) failures.push('search returned no results')
+  if (ui.revealed !== true) failures.push('search hit did not reveal the matched block')
   if (failures.length > 0 || code !== 0) {
     console.error('[smoke]', JSON.stringify(result))
     console.error(failures.join('\n'))
