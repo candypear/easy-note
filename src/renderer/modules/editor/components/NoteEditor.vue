@@ -263,6 +263,8 @@ function onMouseMove(event: MouseEvent): void {
     handle.value = null
     return
   }
+  const target = event.target
+  if (target instanceof Element && target.closest('.block-handle')) return
   const info = instance.view.posAtCoords({ left: event.clientX, top: event.clientY })
   if (!info) {
     handle.value = null
@@ -505,7 +507,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="note-editor">
+  <div class="note-editor" @mousemove="onMouseMove" @mouseleave="handle = null">
     <FindBar :editor="editor" :open="findOpen" @close="findOpen = false" />
     <ExternalChangeBanner
       :visible="external"
@@ -523,8 +525,6 @@ onBeforeUnmount(() => {
     <div
       v-else
       class="editor-scroll"
-      @mousemove="onMouseMove"
-      @mouseleave="handle = null"
       @scroll="handle = null"
     >
       <SourceMode v-if="ctx.workspace.sourceMode" v-model="sourceValue" />

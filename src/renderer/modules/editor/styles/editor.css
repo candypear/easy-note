@@ -3,7 +3,14 @@
   line-height: 1.7;
   color: var(--text-primary);
   outline: none;
+  box-shadow: none;
   caret-color: var(--text-primary);
+}
+
+.editor-content:focus,
+.editor-content:focus-visible {
+  outline: none;
+  box-shadow: none;
 }
 
 .editor-content > *:first-child {

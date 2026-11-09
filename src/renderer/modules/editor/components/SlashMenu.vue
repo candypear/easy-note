@@ -59,13 +59,14 @@ const active = ref(0)
 
 const filtered = computed(() => {
   const query = props.query.trim().toLowerCase()
-  if (!query) return items.slice(0, 8)
-  return items
-    .filter((item) => item.label.toLowerCase().includes(query) || item.id.includes(query))
-    .slice(0, 8)
+  if (!query) return items
+  return items.filter((item) => item.label.toLowerCase().includes(query) || item.id.includes(query))
 })
 
-const top = computed(() => Math.max(8, Math.min(props.y, window.innerHeight - 340)))
+const menuHeight = computed(() =>
+  Math.min(filtered.value.length * 32 + 10, 400, window.innerHeight - 16)
+)
+const top = computed(() => Math.max(8, Math.min(props.y, window.innerHeight - menuHeight.value - 8)))
 const left = computed(() => Math.max(8, Math.min(props.x, window.innerWidth - 296)))
 
 function select(item: Item): void {
@@ -127,7 +128,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown, true))
   position: fixed;
   z-index: 55;
   width: 280px;
-  max-height: 320px;
+  max-height: min(400px, calc(100vh - 16px));
   overflow: auto;
   padding: 4px;
   background: var(--bg-elevated);
