@@ -160,10 +160,16 @@ function posAtOrdinal(doc: PMNode, ordinal: number): number | null {
   return pos
 }
 
+function blockAt(instance: Editor, pos: number): PMNode | null {
+  const doc = instance.state.doc
+  if (pos < 0 || pos >= doc.content.size) return null
+  return doc.nodeAt(pos)
+}
+
 function flashBlock(pos: number): void {
   const instance = editor.value
   if (!instance) return
-  const node = instance.state.doc.nodeAt(pos)
+  const node = blockAt(instance, pos)
   if (!node) return
   const dom = instance.view.nodeDOM(pos)
   if (!(dom instanceof HTMLElement)) return
@@ -181,10 +187,14 @@ async function applyReveal(): Promise<void> {
   }
   const blocks = await ctx.api.block.listByNote(asNoteId(target.noteId))
   if (!blocks.ok) return
+  if (editor.value !== instance || currentId !== target.noteId || ctx.workspace.reveal?.nonce !== target.nonce) {
+    return
+  }
   const hit = blocks.data.find((block) => block.id === target.blockId)
   if (!hit) return
-  const pos = posAtOrdinal(instance.state.doc, hit.ordinal)
-  if (pos === null) return
+  const doc = instance.state.doc
+  const pos = posAtOrdinal(doc, hit.ordinal)
+  if (pos === null || pos >= doc.content.size) return
   instance.chain().focus().setTextSelection(pos + 1).scrollIntoView().run()
   flashBlock(pos)
 }
@@ -201,6 +211,7 @@ async function load(noteId: string | null): Promise<void> {
     editor.value.destroy()
     editor.value = null
   }
+  if (currentId !== noteId) ctx.workspace.setHeadings([])
   currentId = noteId
   closeFlyouts()
   error.value = ''
@@ -279,7 +290,7 @@ function onMouseMove(event: MouseEvent): void {
   } catch {
     return
   }
-  if (!instance.state.doc.nodeAt(pos)) return
+  if (!blockAt(instance, pos)) return
   if (handle.value?.pos === pos) return
 
   const rect = el.getBoundingClientRect()
@@ -298,7 +309,7 @@ function openBlockMenu(): void {
 
 const blockMenuItems = computed<MenuItem[]>(() => {
   const instance = editor.value
-  const node = instance?.state.doc.nodeAt(blockMenu.value.pos)
+  const node = instance ? blockAt(instance, blockMenu.value.pos) : null
   const items: MenuItem[] = [
     {
       id: 'convert',
@@ -346,7 +357,7 @@ async function writeClipboard(text: string): Promise<void> {
 function convertBlock(pos: number, kind: string): void {
   const instance = editor.value
   if (!instance) return
-  const node = instance.state.doc.nodeAt(pos)
+  const node = blockAt(instance, pos)
   if (!node) return
   const text = node.isTextblock
     ? node.textContent
@@ -385,7 +396,7 @@ async function onBlockMenuSelect(id: string): Promise<void> {
   blockMenu.value.open = false
   const instance = editor.value
   if (!instance) return
-  const node = instance.state.doc.nodeAt(pos)
+  const node = blockAt(instance, pos)
   if (!node) return
 
   if (id === 'insertBelow') {
@@ -487,9 +498,27 @@ onMounted(() => {
     })
   )
   stops.push(
-    ctx.workspace.onFocusHeading((pos) => {
+    ctx.workspace.onFocusHeading((heading) => {
       const instance = editor.value
       if (!instance) return
+      const doc = instance.state.doc
+      const at = blockAt(instance, heading.pos)
+      const same =
+        at?.type.name === 'heading' &&
+        Number(at.attrs.level ?? 1) === heading.level &&
+        at.textContent.trim() === heading.text
+      let pos = same ? heading.pos : -1
+      if (pos < 0) {
+        doc.descendants((node, nodePos) => {
+          if (pos >= 0) return false
+          if (node.type.name !== 'heading') return true
+          if (Number(node.attrs.level ?? 1) !== heading.level) return true
+          if (node.textContent.trim() !== heading.text) return true
+          pos = nodePos
+          return false
+        })
+      }
+      if (pos < 0 || pos >= doc.content.size) return
       instance.chain().focus().setTextSelection(pos + 1).scrollIntoView().run()
     })
   )

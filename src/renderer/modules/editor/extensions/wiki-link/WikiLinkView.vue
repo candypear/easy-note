@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { NodeViewWrapper } from '@tiptap/vue-3'
-import { computed, onMounted, ref, type PropType } from 'vue'
-import { asNoteId } from '@shared/types/brand'
+import { computed, onBeforeUnmount, onMounted, ref, type PropType } from 'vue'
 import { useContext } from '../../../../app/providers'
+import { onWikiIndexUpdated } from './index-events'
 
 interface NodeViewLike {
   node: { attrs: Record<string, unknown> }
@@ -20,6 +20,7 @@ const props = defineProps({
 })
 const ctx = useContext()
 const missing = ref(false)
+let off: (() => void) | null = null
 
 const target = computed(() => String(props.node.attrs.target ?? ''))
 
@@ -42,8 +43,11 @@ async function open(event: MouseEvent): Promise<void> {
 
 onMounted(() => {
   void check()
-  const off = ctx.events.on('index:updated', () => void check())
-  return off
+  off = onWikiIndexUpdated(ctx, () => void check())
+})
+
+onBeforeUnmount(() => {
+  off?.()
 })
 </script>
 

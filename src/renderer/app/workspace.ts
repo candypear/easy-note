@@ -43,7 +43,7 @@ export function createWorkspace(): Workspace {
   })
 
   let nonce = 0
-  const headingListeners = new Set<(pos: number) => void>()
+  const headingListeners = new Set<(heading: Heading) => void>()
 
   return {
     state,
@@ -167,8 +167,8 @@ export function createWorkspace(): Workspace {
     requestInsertHeading() {
       state.insertHeadingRequest += 1
     },
-    focusHeading(pos) {
-      for (const listener of headingListeners) listener(pos)
+    focusHeading(heading) {
+      for (const listener of headingListeners) listener(heading)
     },
     onFocusHeading(listener) {
       headingListeners.add(listener)

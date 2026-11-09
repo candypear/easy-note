@@ -15,7 +15,7 @@ const { t } = ctx.i18n
       :class="{ h1: heading.level === 1 }"
       :style="{ paddingLeft: `${8 + (heading.level - 1) * 12}px` }"
       type="button"
-      @click="ctx.workspace.focusHeading(heading.pos)"
+      @click="ctx.workspace.focusHeading(heading)"
     >
       {{ heading.text || t('app.untitled') }}
     </button>

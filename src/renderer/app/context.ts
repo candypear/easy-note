@@ -132,8 +132,8 @@ export interface WorkspaceService {
   findRequest: number
   insertHeadingRequest: number
   requestInsertHeading(): void
-  focusHeading(pos: number): void
-  onFocusHeading(listener: (pos: number) => void): () => void
+  focusHeading(heading: Heading): void
+  onFocusHeading(listener: (heading: Heading) => void): () => void
   setDocumentStats(stats: { words: number; characters: number; readingMinutes: number }): void
   setHeadings(headings: Heading[]): void
   setDocumentText(text: string): void
