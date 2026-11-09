@@ -43,6 +43,7 @@
     "@codemirror/state": "6.7.6",
     "@codemirror/view": "6.43.15",
     "@lezer/highlight": "1.2.5",
+    "@lucide/vue": "1.70.0",
     "@tiptap/core": "2.27.3",
     "@tiptap/extension-code-block": "2.27.3",
     "@tiptap/extension-link": "2.27.3",
