@@ -264,20 +264,26 @@ function onMouseMove(event: MouseEvent): void {
     return
   }
   const target = event.target
-  if (target instanceof Element && target.closest('.block-handle')) return
-  const info = instance.view.posAtCoords({ left: event.clientX, top: event.clientY })
-  if (!info) {
-    handle.value = null
+  if (!(target instanceof Element)) return
+  if (target.closest('.block-handle')) return
+  const root = instance.view.dom
+  if (target === root || !root.contains(target)) return
+
+  let el: Element | null = target
+  while (el && el.parentElement !== root) el = el.parentElement
+  if (!el || el === root) return
+
+  let pos: number
+  try {
+    pos = instance.view.posAtDOM(el, 0)
+  } catch {
     return
   }
-  const resolved = instance.state.doc.resolve(info.pos)
-  if (resolved.depth === 0) {
-    handle.value = null
-    return
-  }
-  const blockPos = resolved.before(1)
-  const coords = instance.view.coordsAtPos(blockPos + 1)
-  handle.value = { top: coords.top, left: coords.left - 30, pos: blockPos }
+  if (!instance.state.doc.nodeAt(pos)) return
+  if (handle.value?.pos === pos) return
+
+  const rect = el.getBoundingClientRect()
+  handle.value = { top: rect.top, left: rect.left - 30, pos }
 }
 
 function openBlockMenu(): void {

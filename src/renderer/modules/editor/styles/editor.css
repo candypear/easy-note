@@ -133,6 +133,10 @@
   accent-color: var(--accent);
 }
 
+.editor-content ul[data-type='taskList'].is-empty::before {
+  margin-left: 22px;
+}
+
 .editor-content table {
   width: 100%;
   margin: 12px 0;
