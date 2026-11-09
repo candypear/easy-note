@@ -15,7 +15,6 @@ test('autosaves editor changes to the markdown file', async () => {
 })
 
 test('source mode shows the current editor content and round-trips without data loss', async () => {
-  test.fail(true, 'BUG: entering source mode serializes sourceValue (stale) instead of the live editor')
   const h = await launchHarness({ notes: { 'Alpha.md': '# Alpha\n\nBody text.\n' } })
   try {
     await appendToEditor(h.page, ' KEEPME')
@@ -87,7 +86,6 @@ test('shows an external change banner and loads the disk version', async () => {
 })
 
 test('keeps a saved table indexed as a table block', async () => {
-  test.fail(true, 'BUG: serializer emits a one-dash delimiter that parseMarkdownBlocks rejects')
   const note = ['# Alpha', '', '| a | b |', '| --- | --- |', '| 1 | 2 |', '', 'Tail.'].join('\n')
   const h = await launchHarness({ notes: { 'Alpha.md': note } })
   try {
@@ -106,7 +104,6 @@ test('keeps a saved table indexed as a table block', async () => {
 })
 
 test('keeps a standalone inline tag after editing the note', async () => {
-  test.fail(true, 'BUG: serializer escapes a leading #, and extractInlineTags no longer sees the tag')
   const h = await launchHarness({
     notes: { 'Tagged.md': '# Tagged\n\n#standalone\n\nBody text.\n' }
   })

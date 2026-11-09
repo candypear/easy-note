@@ -70,7 +70,7 @@ function isTableStart(lines: string[], index: number): boolean {
     .replace(/\|$/, '')
     .split('|')
     .map((cell) => cell.trim())
-  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell))
+  return cells.length > 0 && cells.every((cell) => /^:?-+:?$/.test(cell))
 }
 
 function isMathStart(line: string): boolean {

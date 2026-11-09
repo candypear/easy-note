@@ -44,7 +44,6 @@ test('renaming via F2 updates the file heading and incoming wiki links', async (
 })
 
 test('renaming the open note refreshes the editor heading', async () => {
-  test.fail(true, 'BUG: note:renamed reloads the explorer but not the open editor')
   const h = await launchHarness({
     notes: {
       'A.md': '# A\n\nLink [[B]].\n',
@@ -70,7 +69,6 @@ test('renaming the open note refreshes the editor heading', async () => {
 })
 
 test('lists tags and filters notes by selected tag', async () => {
-  test.fail(true, 'BUG: tag filter passes a Vue reactive Proxy over IPC, which cannot be cloned')
   const h = await launchHarness({
     notes: {
       'Alpha.md': '# Alpha\n\n#alpha common\n',

@@ -36,7 +36,7 @@ async function applyFilter(): Promise<void> {
     results.value = []
     return
   }
-  const result = await ctx.api.tag.filter(selected.value, mode.value)
+  const result = await ctx.api.tag.filter([...selected.value], mode.value)
   if (result.ok) results.value = result.data.notes
 }
 

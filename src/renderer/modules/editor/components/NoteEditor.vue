@@ -60,11 +60,15 @@ function updateDerived(): void {
   )
 }
 
-function currentMarkdown(): string {
-  if (ctx.workspace.sourceMode) return sourceValue.value
+function editorMarkdown(): string {
   const instance = editor.value
   if (!instance) return ''
   return documentToMarkdown(instance.getJSON(), frontmatter.value)
+}
+
+function currentMarkdown(): string {
+  if (ctx.workspace.sourceMode) return sourceValue.value
+  return editorMarkdown()
 }
 
 async function saveNow(): Promise<void> {
@@ -427,7 +431,7 @@ watch(
   () => ctx.workspace.sourceMode,
   (enabled) => {
     if (enabled) {
-      sourceValue.value = currentMarkdown()
+      sourceValue.value = editor.value ? editorMarkdown() : sourceValue.value
       return
     }
     if (!editor.value) return
@@ -467,6 +471,11 @@ onMounted(() => {
   stops.push(
     ctx.events.on('note:external-change', ({ noteId }) => {
       if (noteId === currentId) external.value = true
+    })
+  )
+  stops.push(
+    ctx.events.on('note:renamed', ({ noteId }) => {
+      if (noteId === currentId) void load(noteId)
     })
   )
   stops.push(

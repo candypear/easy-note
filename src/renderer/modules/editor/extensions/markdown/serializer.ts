@@ -253,9 +253,39 @@ function blocks(content: JSONContent[]): RootContent[] {
   return result
 }
 
+const FENCE_LINE = /^(\s*)(`{3,}|~{3,})/
+
+/**
+ * remark-stringify escapes a line-leading `#` even when it is not followed by
+ * a space, turning `#tag` into `\#tag`. The tag parser (and the on-disk format)
+ * expect the plain form, so restore it outside fenced code blocks.
+ */
+function unescapeTagHashes(markdown: string): string {
+  let fenced = false
+  let fenceChar = ''
+  return markdown
+    .split('\n')
+    .map((line) => {
+      const fence = line.match(FENCE_LINE)
+      if (fence) {
+        const char = fence[2]?.[0] ?? '`'
+        if (!fenced) {
+          fenced = true
+          fenceChar = char
+        } else if (char === fenceChar) {
+          fenced = false
+        }
+        return line
+      }
+      if (fenced) return line
+      return line.replace(/\\#(?=[\p{L}\p{N}_/-])/gu, '#')
+    })
+    .join('\n')
+}
+
 export function documentToMarkdown(doc: JSONContent, frontmatter = ''): string {
   const root: Root = { type: 'root', children: blocks(doc.content ?? []) }
-  const body = serializer.stringify(root)
+  const body = unescapeTagHashes(serializer.stringify(root))
   return frontmatter ? `${frontmatter}${body}` : body
 }
 
