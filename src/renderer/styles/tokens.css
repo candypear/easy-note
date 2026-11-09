@@ -1,0 +1,42 @@
+:root {
+  --font-ui: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+
+  --topbar-height: 44px;
+  --statusbar-height: 24px;
+  --sidebar-width: 260px;
+  --right-width: 300px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  --radius-input: 4px;
+  --radius-menu: 6px;
+  --radius-dialog: 8px;
+
+  --duration-hover: 120ms;
+  --duration-panel: 180ms;
+  --duration-theme: 200ms;
+
+  --code-keyword: #ad3da4;
+  --code-string: #448361;
+  --code-number: #d9730d;
+  --code-comment: #9b9a97;
+  --code-function: #337ea9;
+  --code-type: #9065b0;
+  --code-variable: #37352f;
+  --code-punctuation: #787774;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-hover: 0ms;
+    --duration-panel: 0ms;
+    --duration-theme: 0ms;
+  }
+}

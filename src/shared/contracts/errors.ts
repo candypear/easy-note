@@ -1,0 +1,24 @@
+export type ErrorCode =
+  | 'VAULT_NOT_READY'
+  | 'VAULT_INVALID'
+  | 'VAULT_WRITE_DENIED'
+  | 'VAULT_OPEN_FAILED'
+  | 'NOTE_NOT_FOUND'
+  | 'NOTE_CONFLICT'
+  | 'FOLDER_NOT_FOUND'
+  | 'FOLDER_CONFLICT'
+  | 'BLOCK_NOT_FOUND'
+  | 'TAG_NOT_FOUND'
+  | 'PATH_OUTSIDE_VAULT'
+  | 'INVALID_REQUEST'
+  | 'TRASH_UNAVAILABLE'
+  | 'FILE_READ_FAILED'
+  | 'FILE_WRITE_FAILED'
+  | 'INDEX_FAILED'
+  | 'SEARCH_FAILED'
+  | 'INTERNAL'
+
+export interface IpcError {
+  code: ErrorCode
+  message: string
+}
