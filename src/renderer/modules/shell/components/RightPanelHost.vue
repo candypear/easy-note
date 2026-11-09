@@ -35,8 +35,8 @@ const active = computed(() => tabs.find((tab) => tab.id === ctx.shell.state.righ
   flex-direction: column;
   height: 100%;
   min-width: 0;
-  background: var(--bg-sidebar);
-  border-left: 1px solid var(--border);
+  background: var(--bg-right-panel);
+  border-left: 1px solid var(--border-layout);
 }
 
 .panel-header {

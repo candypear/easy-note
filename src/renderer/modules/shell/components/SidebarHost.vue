@@ -54,8 +54,8 @@ function openGraph(): void {
   flex-direction: column;
   height: 100%;
   min-width: 0;
-  background: var(--bg-sidebar);
-  border-right: 1px solid var(--border);
+  background: var(--bg-left-panel);
+  border-right: 1px solid var(--border-layout);
 }
 
 .tabs {

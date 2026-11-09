@@ -114,15 +114,19 @@
 | Token | 亮色 | 暗色 | 用途 |
 | --- | --- | --- | --- |
 | `bg-app` | `#FFFFFF` | `#191919` | 顶栏、编辑区、状态栏 |
-| `bg-sidebar` | `#F7F6F3` | `#202020` | 左栏、右栏、代码块底色 |
+| `bg-sidebar` | `#F7F6F3` | `#202020` | 代码块、内联代码、表头等次要表面 |
+| `bg-left-panel` | `#F9F9F9` | `#202020` | 左侧栏底色 |
+| `bg-right-panel` | `#FFFFFF` | `#202020` | 右侧栏底色 |
 | `bg-elevated` | `#FFFFFF` | `#252525` | 菜单、浮层、对话框、Toast |
 | `bg-hover` | `rgba(55,53,47,0.06)` | `rgba(255,255,255,0.055)` | 悬停 |
 | `bg-selected` | `rgba(35,131,226,0.10)` | `rgba(82,156,202,0.16)` | 选中、焦点行 |
 | `border` | `#E9E9E7` | `#2F2F2F` | 默认分隔线 |
 | `border-strong` | `#D3D1CB` | `#454545` | 输入框、强分隔 |
+| `border-layout` | `#F9F9F9` | `#2F2F2F` | 左栏 / 右栏与正文之间的 1px 分隔 |
 | `text-primary` | `#37352F` | `#D4D4D4` | 正文、标题 |
 | `text-secondary` | `#787774` | `#9B9B9B` | 次要信息、未选中 Tab |
 | `text-tertiary` | `#9B9A97` | `#6F6F6F` | 占位、路径、计数 |
+| `text-menu` | `#767676` | `#9B9B9B` | 菜单项文字 |
 | `accent` | `#2383E2` | `#529CCA` | 链接、选中、焦点 |
 | `accent-hover` | `#1A70C8` | `#6FB0DC` | 强调色悬停 |
 | `accent-active` | `#1560B0` | `#3E7FA8` | 强调色按下 |

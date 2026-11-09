@@ -146,7 +146,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown, true))
   padding: 0 8px;
   border-radius: var(--radius-input);
   font-size: 13px;
-  color: var(--text-primary);
+  color: var(--text-menu);
   text-align: left;
 }
 

@@ -149,7 +149,7 @@ onBeforeUnmount(() => {
   border-radius: var(--radius-input);
   font-size: 13px;
   text-align: left;
-  color: var(--text-primary);
+  color: var(--text-menu);
 }
 
 .menu-item:hover:not(:disabled) {
