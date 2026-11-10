@@ -49,6 +49,7 @@ export class SettingsService {
     Object.assign(this.state, patch)
     this.normalize()
     await this.persist()
+    if (keys.includes('theme')) this.ctx.theme.setMode(this.state.theme)
     this.ctx.events.publish('settings:changed', { keys, settings: this.get() })
     return this.get()
   }
@@ -119,6 +120,7 @@ export function createSettingsModule(ctx: MainContext): SettingsModule {
     },
     async start() {
       await service.load()
+      ctx.theme.setMode(service.get().theme)
       unsubscribe = ctx.theme.onChange((theme) => ctx.events.publish('theme:changed', { theme }))
     },
     async stop() {
