@@ -44,6 +44,8 @@ const props = defineProps<{
 }>()
 
 const FALLBACK: PreviewDefinition = { kind: 'paragraph', markdown: '这是一段正文。' }
+const TYPE_INTERVAL_MS = 30
+const REVEAL_DELAY_MS = 520
 const definition = computed<PreviewDefinition>(() => PREVIEWS[props.itemId] ?? FALLBACK)
 const phase = ref<'typing' | 'rendered'>('typing')
 const typed = ref('')
@@ -84,8 +86,8 @@ function start(): void {
     revealTimer = setTimeout(() => {
       phase.value = 'rendered'
       revealTimer = null
-    }, 280)
-  }, 14)
+    }, REVEAL_DELAY_MS)
+  }, TYPE_INTERVAL_MS)
 }
 
 watch(() => props.itemId, start, { immediate: true })
@@ -216,7 +218,7 @@ onBeforeUnmount(stopTimers)
   margin-left: 1px;
   vertical-align: -2px;
   background: var(--accent);
-  animation: preview-caret 0.8s steps(1) infinite;
+  animation: preview-caret 1s steps(1) infinite;
 }
 
 @keyframes preview-caret {
@@ -352,8 +354,8 @@ onBeforeUnmount(stopTimers)
 .preview-fade-enter-active,
 .preview-fade-leave-active {
   transition:
-    opacity 160ms ease,
-    transform 160ms ease;
+    opacity 220ms ease,
+    transform 220ms ease;
 }
 
 .preview-fade-enter-from {
