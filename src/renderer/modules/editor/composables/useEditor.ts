@@ -7,7 +7,7 @@ import TableRow from '@tiptap/extension-table-row'
 import TaskItem from '@tiptap/extension-task-item'
 import TaskList from '@tiptap/extension-task-list'
 import StarterKit from '@tiptap/starter-kit'
-import { Extension, type Editor as CoreEditor, type Extensions, type JSONContent } from '@tiptap/core'
+import { Extension, type Attribute, type Editor as CoreEditor, type Extensions, type JSONContent } from '@tiptap/core'
 import { Editor as EditorClass } from '@tiptap/vue-3'
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model'
 import { TextSelection } from '@tiptap/pm/state'
@@ -77,6 +77,34 @@ const EditorKeymap = Extension.create({
   }
 })
 
+const alignAttribute: Attribute = {
+  default: null,
+  parseHTML: (element) => element.getAttribute('data-align'),
+  renderHTML: (attributes) => {
+    const value: unknown = attributes.align
+    if (value !== 'left' && value !== 'center' && value !== 'right') return null
+    return { 'data-align': value, style: `text-align: ${value}` }
+  }
+}
+
+const AlignedTableCell = TableCell.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      align: alignAttribute
+    }
+  }
+})
+
+const AlignedTableHeader = TableHeader.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      align: alignAttribute
+    }
+  }
+})
+
 export function buildExtensions(placeholder: string): Extensions {
   return [
     StarterKit.configure({
@@ -94,8 +122,8 @@ export function buildExtensions(placeholder: string): Extensions {
     TaskItem.configure({ nested: true }),
     Table.configure({ resizable: false, allowTableNodeSelection: true }),
     TableRow,
-    TableHeader,
-    TableCell,
+    AlignedTableHeader,
+    AlignedTableCell,
     CodeBlock,
     MathBlock,
     MathInline,

@@ -43,6 +43,20 @@ const wiki = ref({
   mode: 'wiki' as 'wiki' | 'embed'
 })
 const handle = ref<{ top: number; left: number; pos: number } | null>(null)
+type TableAlign = 'left' | 'center' | 'right'
+const TABLE_TOOLBAR_WIDTH = 82
+const TABLE_TOOLBAR_HEIGHT = 30
+const TABLE_ALIGNS: { value: TableAlign; icon: string; labelKey: string }[] = [
+  { value: 'left', icon: 'alignLeft', labelKey: 'editor.alignLeft' },
+  { value: 'center', icon: 'alignCenter', labelKey: 'editor.alignCenter' },
+  { value: 'right', icon: 'alignRight', labelKey: 'editor.alignRight' }
+]
+const tableToolbar = ref<{
+  pos: number
+  top: number
+  left: number
+  align: TableAlign
+} | null>(null)
 const contextMenu = ref({
   open: false,
   kind: 'block' as 'block' | 'table',
@@ -226,6 +240,79 @@ function tableContextAt(
   return null
 }
 
+function tableAlignOf(table: PMNode): TableAlign {
+  const value = table.firstChild?.firstChild?.attrs.align
+  return value === 'center' || value === 'right' ? value : 'left'
+}
+
+function syncTableToolbar(): void {
+  const instance = editor.value
+  if (!instance || ctx.workspace.sourceMode) {
+    tableToolbar.value = null
+    return
+  }
+  const selection = instance.state.selection
+  if (!(selection instanceof NodeSelection)) {
+    tableToolbar.value = null
+    return
+  }
+  const table = instance.state.doc.nodeAt(selection.from)
+  if (!table || table.type.name !== 'table') {
+    tableToolbar.value = null
+    return
+  }
+  const dom = instance.view.nodeDOM(selection.from)
+  if (!(dom instanceof HTMLElement)) {
+    tableToolbar.value = null
+    return
+  }
+  const rect = dom.getBoundingClientRect()
+  if (rect.bottom < 48 || rect.top > window.innerHeight) {
+    tableToolbar.value = null
+    return
+  }
+  const left = Math.min(
+    Math.max(8, rect.right - TABLE_TOOLBAR_WIDTH),
+    Math.max(8, window.innerWidth - TABLE_TOOLBAR_WIDTH - 8)
+  )
+  const top = Math.min(
+    Math.max(48, rect.top - TABLE_TOOLBAR_HEIGHT - 4),
+    Math.max(48, window.innerHeight - TABLE_TOOLBAR_HEIGHT - 8)
+  )
+  tableToolbar.value = { pos: selection.from, left, top, align: tableAlignOf(table) }
+}
+
+function applyTableAlignment(align: TableAlign): void {
+  const instance = editor.value
+  const toolbar = tableToolbar.value
+  if (!instance || !toolbar) return
+  const table = instance.state.doc.nodeAt(toolbar.pos)
+  if (!table || table.type.name !== 'table') return
+  const tr = instance.state.tr
+  table.forEach((row, rowOffset) => {
+    row.forEach((cell, cellOffset) => {
+      tr.setNodeMarkup(toolbar.pos + 2 + rowOffset + cellOffset, undefined, {
+        ...cell.attrs,
+        align
+      })
+    })
+  })
+  tr.setSelection(NodeSelection.create(tr.doc, toolbar.pos))
+  instance.view.dispatch(tr)
+  instance.view.focus()
+  tableToolbar.value = { ...toolbar, align }
+}
+
+function onSelectionChange(): void {
+  checkTriggers()
+  syncTableToolbar()
+}
+
+function onEditorScroll(): void {
+  handle.value = null
+  syncTableToolbar()
+}
+
 function tableDimensions(table: PMNode): { rows: number; cols: number } {
   let cols = 0
   table.forEach((row) => {
@@ -290,6 +377,7 @@ async function load(noteId: string | null): Promise<void> {
   if (currentId !== noteId) ctx.workspace.setHeadings([])
   currentId = noteId
   closeFlyouts()
+  tableToolbar.value = null
   error.value = ''
   external.value = false
   if (!noteId) {
@@ -316,7 +404,7 @@ async function load(noteId: string | null): Promise<void> {
     content: parsed.doc,
     placeholder: t('editor.placeholder'),
     onUpdate,
-    onSelectionChange: checkTriggers
+    onSelectionChange
   })
   applying = false
   loading.value = false
@@ -680,6 +768,7 @@ watch(
   () => ctx.workspace.sourceMode,
   (enabled) => {
     if (enabled) {
+      tableToolbar.value = null
       sourceValue.value = editor.value ? editorMarkdown() : sourceValue.value
       return
     }
@@ -717,6 +806,9 @@ watch(
 )
 
 onMounted(() => {
+  const onResize = (): void => syncTableToolbar()
+  window.addEventListener('resize', onResize)
+  stops.push(() => window.removeEventListener('resize', onResize))
   stops.push(
     ctx.events.on('note:external-change', ({ noteId }) => {
       if (noteId === currentId) external.value = true
@@ -795,7 +887,7 @@ onBeforeUnmount(() => {
     <div
       v-else
       class="editor-scroll"
-      @scroll="handle = null"
+      @scroll="onEditorScroll"
     >
       <SourceMode v-if="ctx.workspace.sourceMode" v-model="sourceValue" />
       <div v-else class="wysiwyg">
@@ -819,6 +911,28 @@ onBeforeUnmount(() => {
     >
       <Icon name="grip" :size="16" />
     </button>
+
+    <div
+      v-if="tableToolbar && !ctx.workspace.sourceMode && !isEmpty"
+      class="table-toolbar no-drag"
+      role="toolbar"
+      :aria-label="t('editor.tableAlign')"
+      :style="{ top: `${tableToolbar.top}px`, left: `${tableToolbar.left}px` }"
+    >
+      <button
+        v-for="option in TABLE_ALIGNS"
+        :key="option.value"
+        type="button"
+        :class="{ active: tableToolbar.align === option.value }"
+        :aria-label="t(option.labelKey)"
+        :aria-pressed="tableToolbar.align === option.value"
+        :title="t(option.labelKey)"
+        @mousedown.prevent
+        @click="applyTableAlignment(option.value)"
+      >
+        <Icon :name="option.icon" :size="14" />
+      </button>
+    </div>
 
     <SlashMenu
       :editor="editor"
@@ -958,6 +1072,39 @@ onBeforeUnmount(() => {
 .block-handle:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.table-toolbar {
+  position: fixed;
+  z-index: 21;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-menu);
+  box-shadow: var(--shadow-menu);
+}
+
+.table-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+}
+
+.table-toolbar button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.table-toolbar button.active {
+  background: var(--bg-selected);
+  color: var(--accent);
 }
 
 .table-size {

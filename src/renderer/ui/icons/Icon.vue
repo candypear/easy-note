@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
   ArrowDown,
   ArrowUp,
   Bold,
@@ -101,7 +104,10 @@ const ICONS: Record<string, LucideIcon> = {
   external: ExternalLink,
   bold: Bold,
   italic: Italic,
-  strike: Strikethrough
+  strike: Strikethrough,
+  alignLeft: AlignLeft,
+  alignCenter: AlignCenter,
+  alignRight: AlignRight
 }
 
 const icon = computed(() => ICONS[props.name])
