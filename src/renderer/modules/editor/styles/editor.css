@@ -158,7 +158,7 @@
   font-weight: 600;
 }
 
-.editor-content .is-empty::before {
+.editor-content .is-empty:not(table)::before {
   content: attr(data-placeholder);
   float: left;
   height: 0;
