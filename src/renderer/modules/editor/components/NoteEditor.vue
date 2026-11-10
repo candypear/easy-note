@@ -859,11 +859,11 @@ onBeforeUnmount(() => {
       <div class="table-size">
         <label class="table-size-field">
           <span>{{ t('editor.rows') }}</span>
-          <BaseInput v-model="tableSize.rows" size="sm" />
+          <BaseInput v-model="tableSize.rows" />
         </label>
         <label class="table-size-field">
           <span>{{ t('editor.columns') }}</span>
-          <BaseInput v-model="tableSize.cols" size="sm" />
+          <BaseInput v-model="tableSize.cols" />
         </label>
       </div>
       <template #footer>
@@ -961,20 +961,27 @@ onBeforeUnmount(() => {
 }
 
 .table-size {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
 .table-size-field {
   display: flex;
-  flex: 1;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   font-size: 13px;
   color: var(--text-secondary);
 }
 
+.table-size-field > span {
+  flex: none;
+  white-space: nowrap;
+}
+
 .table-size-field :deep(.base-input) {
   flex: 1;
+  min-width: 0;
 }
 </style>
