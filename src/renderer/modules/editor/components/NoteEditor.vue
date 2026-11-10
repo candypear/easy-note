@@ -984,4 +984,13 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 0;
 }
+
+.table-size-field :deep(.base-input:focus-within) {
+  border-color: var(--border-strong);
+  box-shadow: none;
+}
+
+.table-size-field :deep(input:focus-visible) {
+  box-shadow: none;
+}
 </style>
