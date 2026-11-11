@@ -236,21 +236,22 @@ onBeforeUnmount(() => {
   height: 28px;
   padding: 2px;
   gap: 2px;
-  background: var(--bg-sidebar);
+  background: var(--bg-inset);
   border-radius: var(--radius-input);
 }
 
 .segmented button {
   padding: 0 8px;
-  border-radius: 3px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-input) - 2px);
   font-size: 12px;
   color: var(--text-secondary);
 }
 
 .segmented button.active {
-  background: var(--bg-app);
-  border: 1px solid var(--border);
+  background: var(--bg-selected);
   color: var(--text-primary);
+  font-weight: 500;
 }
 
 .clear {
@@ -274,7 +275,7 @@ onBeforeUnmount(() => {
   padding: 0 6px;
   border-radius: var(--radius-input);
   cursor: pointer;
-  font-size: 13.5px;
+  font-size: var(--font-size-ui);
 }
 
 .tag-row:hover {
@@ -292,7 +293,7 @@ onBeforeUnmount(() => {
   width: 14px;
   height: 14px;
   border: 1px solid var(--border-strong);
-  border-radius: 3px;
+  border-radius: 4px;
   color: #fff;
   flex: none;
 }
@@ -327,7 +328,7 @@ onBeforeUnmount(() => {
   padding: 0 4px;
   background: var(--bg-app);
   border: 1px solid var(--accent);
-  border-radius: 3px;
+  border-radius: var(--radius-inline);
   outline: none;
   font-size: 13px;
 }

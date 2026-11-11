@@ -188,9 +188,9 @@ function draw(): void {
   context.setTransform(dpr, 0, 0, dpr, 0, 0)
   context.clearRect(0, 0, canvasWidth, canvasHeight)
   const styles = getComputedStyle(document.documentElement)
-  const accent = styles.getPropertyValue('--accent').trim() || '#2383e2'
-  const border = styles.getPropertyValue('--border-strong').trim() || '#d3d1cb'
-  const text = styles.getPropertyValue('--text-secondary').trim() || '#787774'
+  const accent = styles.getPropertyValue('--accent').trim() || '#2f81f7'
+  const border = styles.getPropertyValue('--border-strong').trim() || '#d0d0d0'
+  const text = styles.getPropertyValue('--text-secondary').trim() || '#5d5d5d'
   const background = styles.getPropertyValue('--bg-app').trim() || '#ffffff'
   context.fillStyle = background
   context.fillRect(0, 0, canvasWidth, canvasHeight)
@@ -448,20 +448,21 @@ onBeforeUnmount(() => {
   height: 28px;
   padding: 2px;
   gap: 2px;
-  background: var(--bg-sidebar);
+  background: var(--bg-inset);
   border-radius: var(--radius-input);
 }
 
 .segmented button {
   padding: 0 8px;
-  border-radius: 3px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-input) - 2px);
   font-size: 12px;
   color: var(--text-secondary);
 }
 
 .segmented button.active {
-  background: var(--bg-app);
-  border: 1px solid var(--border);
+  background: var(--bg-selected);
+  font-weight: 500;
   color: var(--text-primary);
 }
 

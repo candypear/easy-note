@@ -188,7 +188,7 @@ onBeforeUnmount(stopTimers)
 .preview-phase {
   flex: none;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .preview-body {
@@ -252,15 +252,15 @@ onBeforeUnmount(stopTimers)
 }
 
 .preview-render h1 {
-  font-size: 22px;
+  font-size: 20px;
 }
 
 .preview-render h2 {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .preview-render h3 {
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .preview-render ul,
@@ -276,15 +276,15 @@ onBeforeUnmount(stopTimers)
 .preview-render blockquote {
   margin: 0;
   padding-left: 10px;
-  border-left: 3px solid var(--border-strong);
+  border-left: 2px solid var(--border-strong);
   color: var(--text-secondary);
 }
 
 .preview-render pre {
   margin: 0;
   padding: 8px;
-  background: var(--bg-sidebar);
-  border-radius: 6px;
+  background: var(--bg-inset);
+  border-radius: var(--radius-inline);
   overflow: hidden;
   font-family: var(--font-mono);
   font-size: 12px;
@@ -309,8 +309,8 @@ onBeforeUnmount(stopTimers)
 }
 
 .preview-render th {
-  background: var(--bg-sidebar);
-  font-weight: 600;
+  background: var(--bg-inset);
+  font-weight: 500;
 }
 
 .preview-task-list {

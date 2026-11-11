@@ -52,7 +52,7 @@ onMounted(() => undefined)
   background: var(--tooltip-bg);
   color: var(--tooltip-text);
   border-radius: var(--radius-input);
-  font-size: 12px;
+  font-size: var(--font-size-meta);
   line-height: 1.4;
   white-space: nowrap;
   pointer-events: none;

@@ -43,7 +43,7 @@ async function open(event: MouseEvent): Promise<void> {
   color: var(--accent);
   cursor: pointer;
   background: var(--bg-selected);
-  border-radius: 3px;
+  border-radius: var(--radius-inline);
   padding: 0 4px;
   font-size: 0.95em;
 }

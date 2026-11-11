@@ -35,8 +35,8 @@ export function createCodeEditor(parent: HTMLElement, options: CodeEditorOptions
   let language = options.language
 
   const theme = EditorView.theme({
-    '&': { height: '100%', fontSize: '13.5px', backgroundColor: 'transparent' },
-    '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.6', overflow: 'auto' },
+    '&': { height: '100%', fontSize: '12.5px', backgroundColor: 'transparent' },
+    '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.7', overflow: 'auto' },
     '.cm-content': { padding: '8px 0', caretColor: 'var(--text-primary)' },
     '.cm-gutters': { backgroundColor: 'transparent', border: 'none', color: 'var(--text-tertiary)' },
     '.cm-lineNumbers .cm-gutterElement': { padding: '0 8px 0 0', minWidth: '24px' },

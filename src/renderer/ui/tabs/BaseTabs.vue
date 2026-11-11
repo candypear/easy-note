@@ -36,7 +36,7 @@ const emit = defineEmits<{ 'update:modelValue': [id: string] }>()
   position: relative;
   height: 32px;
   padding: 0 8px;
-  font-size: 13px;
+  font-size: var(--font-size-ui);
   color: var(--text-secondary);
 }
 

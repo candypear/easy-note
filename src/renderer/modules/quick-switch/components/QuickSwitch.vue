@@ -181,13 +181,16 @@ onBeforeUnmount(() => {
   text-align: left;
 }
 
-.result:hover,
-.result.active {
+.result:hover {
   background: var(--bg-hover);
 }
 
+.result.active {
+  background: var(--bg-selected);
+}
+
 .title {
-  font-size: 13.5px;
+  font-size: var(--font-size-ui);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

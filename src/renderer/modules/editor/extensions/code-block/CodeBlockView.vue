@@ -122,7 +122,8 @@ onBeforeUnmount(() => {
 <style scoped>
 .code-block {
   margin: 8px 0;
-  background: var(--bg-sidebar);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: var(--radius-menu);
   overflow: hidden;
 }
@@ -145,7 +146,7 @@ onBeforeUnmount(() => {
   padding: 0 4px;
   background: transparent;
   border: 0;
-  border-radius: 3px;
+  border-radius: var(--radius-inline);
   font-size: 12px;
   color: var(--text-secondary);
   outline: none;
@@ -167,7 +168,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 3px;
+  border-radius: var(--radius-inline);
   color: var(--text-tertiary);
 }
 

@@ -147,7 +147,7 @@ function close(): void {
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 3px;
+  border-radius: var(--radius-inline);
   color: var(--text-secondary);
 }
 

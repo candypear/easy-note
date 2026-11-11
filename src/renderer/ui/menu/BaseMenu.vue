@@ -147,7 +147,7 @@ onBeforeUnmount(() => {
   height: 28px;
   padding: 0 8px;
   border-radius: var(--radius-input);
-  font-size: 13px;
+  font-size: var(--font-size-ui);
   text-align: left;
   color: var(--text-menu);
 }
@@ -161,7 +161,7 @@ onBeforeUnmount(() => {
 }
 
 .menu-item.danger:hover:not(:disabled) {
-  background: rgba(235, 87, 87, 0.08);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
 }
 
 .menu-item.disabled {
@@ -186,7 +186,7 @@ onBeforeUnmount(() => {
 
 .shortcut {
   color: var(--text-tertiary);
-  font-size: 12px;
+  font-size: var(--font-size-meta);
 }
 
 .submenu {

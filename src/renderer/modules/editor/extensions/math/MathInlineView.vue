@@ -61,11 +61,11 @@ function update(value: string): void {
 .math-inline-input {
   min-width: 120px;
   padding: 0 4px;
-  background: var(--bg-sidebar);
+  background: var(--bg-inset);
   border: 1px solid var(--accent);
-  border-radius: 3px;
+  border-radius: var(--radius-inline);
   font-family: var(--font-mono);
-  font-size: 13.5px;
+  font-size: var(--font-size-ui);
   outline: none;
 }
 

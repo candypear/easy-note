@@ -90,7 +90,7 @@ input {
   background: transparent;
   border: 0;
   outline: none;
-  font-size: 13px;
+  font-size: var(--font-size-ui);
 }
 
 input::placeholder {
@@ -101,7 +101,7 @@ input::placeholder {
   display: inline-flex;
   color: var(--text-tertiary);
   padding: 2px;
-  border-radius: 3px;
+  border-radius: var(--radius-inline);
 }
 
 .clear:hover {

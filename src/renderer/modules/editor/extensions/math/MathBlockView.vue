@@ -70,11 +70,11 @@ onMounted(() => undefined)
   min-height: 32px;
   margin-bottom: 8px;
   padding: 6px 8px;
-  background: var(--bg-sidebar);
+  background: var(--bg-inset);
   border: 1px solid var(--border);
   border-radius: var(--radius-input);
   font-family: var(--font-mono);
-  font-size: 13.5px;
+  font-size: var(--font-size-ui);
   line-height: 1.5;
   resize: vertical;
   outline: none;

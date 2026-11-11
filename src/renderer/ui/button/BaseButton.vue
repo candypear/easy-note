@@ -40,13 +40,13 @@ const className = computed(() => ['base-button', `is-${props.variant}`, `is-${pr
 .is-md {
   height: 32px;
   padding: 0 12px;
-  font-size: 13px;
+  font-size: var(--font-size-ui);
 }
 
 .is-sm {
   height: 28px;
   padding: 0 10px;
-  font-size: 13px;
+  font-size: var(--font-size-ui);
 }
 
 .is-primary {
@@ -101,7 +101,7 @@ const className = computed(() => ['base-button', `is-${props.variant}`, `is-${pr
   color: var(--accent);
   padding: 0;
   height: auto;
-  font-size: 13px;
+  font-size: var(--font-size-ui);
 }
 
 .is-text:hover:not(:disabled) {

@@ -1061,7 +1061,7 @@ onBeforeUnmount(() => {
 .skeleton-line {
   height: 16px;
   background: var(--bg-hover);
-  border-radius: 4px;
+  border-radius: var(--radius-inline);
 }
 
 .editor-error {
@@ -1078,7 +1078,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 4px;
+  border-radius: var(--radius-inline);
   color: var(--text-tertiary);
   background: var(--bg-app);
 }
@@ -1107,7 +1107,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 24px;
   height: 24px;
-  border-radius: 4px;
+  border-radius: var(--radius-inline);
   color: var(--text-secondary);
 }
 
@@ -1118,7 +1118,7 @@ onBeforeUnmount(() => {
 
 .table-toolbar button.active {
   background: var(--bg-selected);
-  color: var(--accent);
+  color: var(--text-primary);
 }
 
 .table-size {

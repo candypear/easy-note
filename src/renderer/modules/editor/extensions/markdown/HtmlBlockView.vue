@@ -27,10 +27,12 @@ const value = computed(() => String(props.node.attrs.value ?? ''))
 .html-block {
   margin: 8px 0;
   padding: 8px 12px;
-  background: var(--bg-sidebar);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: var(--radius-menu);
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 12.5px;
+  line-height: 1.7;
   color: var(--text-secondary);
   white-space: pre-wrap;
   overflow-x: auto;

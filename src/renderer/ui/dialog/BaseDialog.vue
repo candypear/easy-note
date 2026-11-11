@@ -83,19 +83,19 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown, true))
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-dialog);
-  box-shadow: var(--shadow-menu);
+  box-shadow: var(--shadow-dialog);
 }
 
 .dialog-title {
   margin: 0 0 12px;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
 }
 
 .dialog-body {
   min-height: 0;
   overflow: auto;
-  font-size: 13px;
+  font-size: var(--font-size-ui);
   line-height: 1.6;
 }
 

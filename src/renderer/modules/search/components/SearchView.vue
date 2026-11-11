@@ -172,8 +172,8 @@ onBeforeUnmount(() => {
 }
 
 .title {
-  font-size: 13.5px;
-  font-weight: 500;
+  font-size: var(--font-size-ui);
+  font-weight: 400;
 }
 
 .snippet {

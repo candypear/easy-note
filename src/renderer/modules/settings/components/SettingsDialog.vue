@@ -207,21 +207,22 @@ async function rebuild(): Promise<void> {
   height: 28px;
   padding: 2px;
   gap: 2px;
-  background: var(--bg-sidebar);
+  background: var(--bg-inset);
   border-radius: var(--radius-input);
 }
 
 .segmented button {
   padding: 0 8px;
-  border-radius: 3px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-input) - 2px);
   font-size: 12px;
   color: var(--text-secondary);
 }
 
 .segmented button.active {
-  background: var(--bg-app);
-  border: 1px solid var(--border);
+  background: var(--bg-selected);
   color: var(--text-primary);
+  font-weight: 500;
 }
 
 .expandable {

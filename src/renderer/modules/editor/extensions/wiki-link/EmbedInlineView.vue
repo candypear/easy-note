@@ -49,8 +49,8 @@ async function open(event: MouseEvent): Promise<void> {
   align-items: center;
   gap: 4px;
   padding: 0 5px;
-  background: var(--bg-sidebar);
-  border-radius: 3px;
+  background: var(--bg-inset);
+  border-radius: var(--radius-inline);
   color: var(--text-secondary);
   font-size: 0.92em;
   cursor: pointer;

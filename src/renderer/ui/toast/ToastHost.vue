@@ -42,7 +42,7 @@ const { items, dismiss } = useToast()
   border: 1px solid var(--border);
   border-radius: var(--radius-menu);
   box-shadow: var(--shadow-menu);
-  font-size: 12px;
+  font-size: var(--font-size-meta);
   color: var(--text-primary);
   pointer-events: auto;
 }

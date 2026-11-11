@@ -72,28 +72,30 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="backlinks">
-    <div class="group-title">{{ t('backlinks.linked') }}</div>
-    <div v-if="linked.length === 0" class="empty">
-      <p>{{ t('backlinks.empty') }}</p>
-      <BaseButton variant="ghost" size="sm" @click="copyLink">
-        {{ t('backlinks.copyLink') }}
-      </BaseButton>
-    </div>
-    <button
-      v-for="item in linked"
-      :key="`${item.sourceNoteId}-${item.sourceBlockId ?? ''}`"
-      class="entry"
-      type="button"
-      @click="openSource(item.sourceNoteId)"
-    >
-      <div class="entry-title">
-        <span>{{ item.sourceNoteTitle }}</span>
-        <span v-if="item.blockRef" class="badge">{{ t('backlinks.block') }}</span>
+    <div class="grp">
+      <div class="group-title">{{ t('backlinks.linked') }}</div>
+      <div v-if="linked.length === 0" class="empty">
+        <p>{{ t('backlinks.empty') }}</p>
+        <BaseButton variant="ghost" size="sm" @click="copyLink">
+          {{ t('backlinks.copyLink') }}
+        </BaseButton>
       </div>
-      <div class="context">{{ item.context }}</div>
-    </button>
+      <button
+        v-for="item in linked"
+        :key="`${item.sourceNoteId}-${item.sourceBlockId ?? ''}`"
+        class="entry"
+        type="button"
+        @click="openSource(item.sourceNoteId)"
+      >
+        <div class="entry-title">
+          <span>{{ item.sourceNoteTitle }}</span>
+          <span v-if="item.blockRef" class="badge">{{ t('backlinks.block') }}</span>
+        </div>
+        <div class="context">{{ item.context }}</div>
+      </button>
+    </div>
 
-    <template v-if="unlinked.length > 0">
+    <div v-if="unlinked.length > 0" class="grp">
       <div class="group-title with-action">
         <span>{{ t('backlinks.unlinked') }}</span>
         <button type="button" class="text-button" @click="convertAll">
@@ -113,7 +115,7 @@ onBeforeUnmount(() => {
         <div class="context">{{ item.context }}</div>
         <span class="convert" @click.stop="convert(item)">{{ t('backlinks.convert') }}</span>
       </button>
-    </template>
+    </div>
 
     <div v-if="loading" class="loading">{{ t('shell.loading') }}</div>
   </div>
@@ -123,18 +125,22 @@ onBeforeUnmount(() => {
 .backlinks {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 10px;
+}
+
+.grp {
+  padding: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-menu);
 }
 
 .group-title {
-  margin: 12px 0 4px;
+  margin: 0 0 6px;
+  padding: 2px 4px;
   font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
-}
-
-.group-title:first-child {
-  margin-top: 0;
 }
 
 .with-action {
@@ -171,13 +177,13 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13.5px;
+  font-size: var(--font-size-ui);
 }
 
 .badge {
   padding: 0 4px;
-  background: var(--bg-sidebar);
-  border-radius: 3px;
+  background: var(--bg-inset);
+  border-radius: var(--radius-inline);
   font-size: 11px;
   color: var(--text-tertiary);
 }

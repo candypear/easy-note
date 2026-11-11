@@ -1,6 +1,13 @@
 :root {
-  --font-ui: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+  --font-ui: 'Inter', 'Noto Sans SC', -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+
+  --font-size-body: 14px;
+  --font-size-ui: 13px;
+  --font-size-meta: 12px;
+  --font-size-title: 20px;
+  --font-weight-title: 600;
+  --line-height-body: 1.75;
 
   --topbar-height: 44px;
   --statusbar-height: 24px;
@@ -15,22 +22,14 @@
   --space-8: 32px;
   --space-12: 48px;
 
-  --radius-input: 4px;
-  --radius-menu: 6px;
-  --radius-dialog: 8px;
+  --radius-inline: 6px;
+  --radius-input: 8px;
+  --radius-menu: 12px;
+  --radius-dialog: 16px;
 
   --duration-hover: 120ms;
   --duration-panel: 180ms;
   --duration-theme: 200ms;
-
-  --code-keyword: #ad3da4;
-  --code-string: #448361;
-  --code-number: #d9730d;
-  --code-comment: #9b9a97;
-  --code-function: #337ea9;
-  --code-type: #9065b0;
-  --code-variable: #37352f;
-  --code-punctuation: #787774;
 }
 
 @media (prefers-reduced-motion: reduce) {

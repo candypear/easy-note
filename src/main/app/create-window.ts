@@ -18,7 +18,7 @@ export function createMainWindow(ctx: MainContext): BrowserWindow {
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
     thickFrame: !isMac,
     titleBarOverlay: false,
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#191919' : '#FFFFFF',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0d0d0d' : '#FFFFFF',
     webPreferences: {
       preload: join(import.meta.dirname, '../preload/index.cjs'),
       contextIsolation: true,

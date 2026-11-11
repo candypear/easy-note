@@ -34,8 +34,8 @@ const src = computed(() => String(props.node.attrs.src ?? ''))
   align-items: center;
   gap: 6px;
   padding: 1px 6px;
-  background: var(--bg-sidebar);
-  border-radius: 3px;
+  background: var(--bg-inset);
+  border-radius: var(--radius-inline);
   font-size: 12px;
   color: var(--text-secondary);
 }

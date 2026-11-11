@@ -253,7 +253,7 @@ function onDragLeave(): void {
   height: 28px;
   padding-right: 6px;
   border-radius: var(--radius-input);
-  font-size: 13.5px;
+  font-size: var(--font-size-ui);
   color: var(--text-primary);
   user-select: none;
 }
@@ -306,7 +306,7 @@ function onDragLeave(): void {
   padding: 0 4px;
   background: var(--bg-app);
   border: 1px solid var(--accent);
-  border-radius: 3px;
+  border-radius: var(--radius-inline);
   font-size: 13px;
   outline: none;
 }

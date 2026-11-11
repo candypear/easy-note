@@ -62,7 +62,7 @@ onMounted(load)
 .embed-block {
   margin: 8px 0;
   padding: 8px 12px;
-  background: var(--bg-sidebar);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-menu);
   cursor: pointer;
@@ -78,7 +78,7 @@ onMounted(load)
 }
 
 .embed-body {
-  font-size: 14px;
+  font-size: var(--font-size-body);
   color: var(--text-primary);
   white-space: pre-wrap;
 }
