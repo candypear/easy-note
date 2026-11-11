@@ -1,3 +1,4 @@
+// 块模块桥接：把 BlockApi 调用转发到对应 IPC 通道，多参数统一打包为对象 payload。
 import type { BlockApi } from '@shared/contracts/block'
 import { BlockChannels } from '@shared/contracts/block'
 import { invoke } from './invoke'

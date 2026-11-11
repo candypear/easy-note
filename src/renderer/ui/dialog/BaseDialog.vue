@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 通用对话框：受控组件（open 由父级持有，关闭只发 close 事件）；
+// Teleport 到 body 避免被父级 overflow/z-index 裁剪，打开时抢占 Esc 并聚焦首个可交互元素。
 import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 
 const props = withDefaults(
@@ -16,11 +18,14 @@ const panel = ref<HTMLElement | null>(null)
 
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape') {
+    // 捕获阶段拦截并阻止冒泡，避免 Esc 同时触发全局快捷键或其他浮层
     event.stopPropagation()
     emit('close')
   }
 }
 
+// 打开时才挂全局监听、关闭即移除，避免常驻监听干扰其他组件；
+// nextTick 后面板已渲染，聚焦首个可交互元素以支持纯键盘操作
 watch(
   () => props.open,
   async (open) => {

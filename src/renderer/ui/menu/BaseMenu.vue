@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 通用上下文菜单：受控组件（open/x/y/items 全由父级传入），选中/关闭只发事件；
+// Teleport 到 body 按视口坐标定位，打开期间捕获全局点击与 Esc 实现"点外部即关"。
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import Icon from '../icons/Icon.vue'
 
@@ -27,9 +29,11 @@ const emit = defineEmits<{
 }>()
 
 const root = ref<HTMLElement | null>(null)
+// 当前展开子菜单的父项 id；同一时刻只展开一个子菜单
 const submenu = ref<string | null>(null)
 
 const position = computed(() => {
+  // 只做视口边缘钳制（留 8px），不做翻转；SSR/测试环境无 window 时用默认分辨率
   const maxX = typeof window === 'undefined' ? 1920 : window.innerWidth
   const maxY = typeof window === 'undefined' ? 1080 : window.innerHeight
   return {
@@ -39,6 +43,7 @@ const position = computed(() => {
 })
 
 function onDocumentPointer(event: PointerEvent): void {
+  // 点击落在菜单（含子菜单）之外才关闭；捕获阶段监听，先于业务点击处理
   if (!(event.target instanceof Node)) return
   if (root.value?.contains(event.target)) return
   emit('close')
@@ -46,11 +51,13 @@ function onDocumentPointer(event: PointerEvent): void {
 
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape') {
+    // 阻止冒泡，避免 Esc 关菜单的同时触发全局快捷键
     event.stopPropagation()
     emit('close')
   }
 }
 
+// 监听随 open 开关挂/卸，关闭时顺带收起子菜单，避免常驻监听与状态残留
 watch(
   () => props.open,
   (open) => {

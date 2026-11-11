@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// 全局 toast 渲染宿主：挂载一次即可，展示 useToast 队列中的消息，点击单条关闭
 import { useToast } from './toast'
 
 const { items, dismiss } = useToast()

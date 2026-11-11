@@ -1,3 +1,5 @@
+// 文件夹模块：维护与 vault 磁盘目录一致的文件夹树，提供创建/重命名/移动/删除与磁盘同步，
+// 并在目录变化时级联更新笔记记录与索引路径。
 import { join } from 'node:path'
 import { nanoid } from 'nanoid'
 import type { MainContext, MainModule } from '@main/bootstrap/types'
@@ -80,6 +82,7 @@ export class FolderService {
     return { root, repository: this.repository }
   }
 
+  // 构建目录树前先同步磁盘，保证外部（文件管理器等）的目录变更也能反映；排序用中文 locale
   async tree(): Promise<FolderTree> {
     await this.syncFromDisk()
     const { repository } = this.requireRoot()
@@ -132,6 +135,7 @@ export class FolderService {
     const clean = sanitizeName(name || '新建文件夹')
     const target = await this.uniqueFolder(parentAbsolute, clean)
     await this.ctx.fs.mkdirp(target)
+    // 落盘后通过磁盘同步获得稳定的文件夹 ID，再广播变更
     await this.syncFromDisk()
     const relative = vaultRelative(root, target)
     const row = repository.byPath(relative)
@@ -140,6 +144,7 @@ export class FolderService {
     return this.toDto(row)
   }
 
+  // 重命名：先改磁盘目录名，再批量改写文件夹/笔记/索引中的路径（rebasePath），保持库与磁盘一致
   async rename(path: string, name: string): Promise<FolderDTO> {
     const { root, repository } = this.requireRoot()
     const relative = normalizeRelative(path)
@@ -166,6 +171,7 @@ export class FolderService {
     const row = repository.byPath(relative)
     if (!row) throw new AppError('FOLDER_NOT_FOUND')
     const parent = normalizeRelative(newParentPath)
+    // 禁止移动到自身或其后代目录内，避免路径循环
     if (parent === relative || parent.startsWith(`${relative}/`)) {
       throw new AppError('INVALID_REQUEST', '不能把文件夹移动到自身内部')
     }
@@ -187,6 +193,8 @@ export class FolderService {
     const row = repository.byPath(relative)
     if (!row) throw new AppError('FOLDER_NOT_FOUND')
     const notes = await this.ctx.services.note.listByPrefix(relative)
+    // 整个目录移入系统回收站（可恢复），随后清理文件夹与笔记索引记录；
+    // 指向被删笔记的链接需要全量重解析以标记失效
     await this.ctx.trash.trash(resolveInVault(root, relative))
     repository.removeByPrefix(relative)
     await this.ctx.services.note.deleteRecordsByPrefix(relative)
@@ -210,6 +218,8 @@ export class FolderService {
     return row ? asFolderId(row.id) : null
   }
 
+  // 递归扫描磁盘目录（跳过隐藏目录），与 folders 表做差量对比：事务内更新/新增/删除，
+  // 按 path 匹配使已有文件夹在扫描后保留原 ID
   async syncFromDisk(): Promise<void> {
     const { root, repository } = this.requireRoot()
     const scanned: { path: string; name: string; parentPath: string }[] = []
@@ -251,6 +261,8 @@ export class FolderService {
     })
   }
 
+  // 目录重命名/移动后改写自身及所有后代的路径，并级联重基笔记记录与 file_state，
+  // 最后重读前缀下的文件重建内容索引，保证派生数据与新路径一致
   private async rebasePath(oldPrefix: string, newPrefix: string, newName: string): Promise<void> {
     const { repository } = this.requireRoot()
     const rows = repository
@@ -275,6 +287,7 @@ export class FolderService {
     await this.ctx.services.note.reindexPrefix(newPrefix)
   }
 
+  // 磁盘上重名时自动追加 " 2"、" 3"… 序号，避免覆盖已有目录
   private async uniqueFolder(parentAbsolute: string, name: string): Promise<string> {
     let candidate = join(parentAbsolute, name)
     let index = 2

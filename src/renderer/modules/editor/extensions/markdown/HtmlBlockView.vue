@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// HTML 块 NodeView：以纯文本（pre 插值）展示 HTML 源码，不渲染执行，避免注入风险。
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { computed, type PropType } from 'vue'
 

@@ -1,3 +1,4 @@
+// 代码块语言支持：提供语言下拉选项，并把语言 id 映射为 CodeMirror 语言扩展。
 import type { Extension } from '@codemirror/state'
 import { closeBrackets, closeBracketsKeymap, completionKeymap } from '@codemirror/autocomplete'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
@@ -44,6 +45,7 @@ export const LANGUAGES: LanguageOption[] = [
   { id: 'mermaid', label: 'Mermaid' }
 ]
 
+// 语言 id → CodeMirror 扩展；无专用语言包（go/yaml/latex 等）返回 null，按纯文本显示
 export function languageExtension(language: string | null): Extension | null {
   switch (language) {
     case 'ts':

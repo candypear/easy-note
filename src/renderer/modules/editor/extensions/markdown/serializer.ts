@@ -1,3 +1,5 @@
+// ProseMirror JSON → Markdown 序列化器（parser 的逆映射）：先转回 mdast，
+// 再由 remark-stringify 输出；wiki/嵌入等自定义节点通过自定义 handler 还原为 [[...]] 语法。
 import type { JSONContent } from '@tiptap/core'
 import type {
   BlockContent,
@@ -45,6 +47,8 @@ interface EmbedInlineNode {
   blockId: string
 }
 
+// 自定义节点的 Markdown 输出规则，与 parser 的识别规则一一对应；
+// embedInline 无块 ID 时省略 #^ 后缀
 const customHandlers = {
   wikiLink(node: WikiLinkNode) {
     return `[[${node.target}]]`
@@ -60,11 +64,14 @@ const customHandlers = {
   }
 } as unknown as Options['handlers']
 
+// 固定列表符号与强调符号（- 和 *），保证序列化输出稳定、diff 最小
 const serializer = unified()
   .use(remarkStringify, { handlers: customHandlers, bullet: '-', emphasis: '*', strong: '*' })
   .use(remarkGfm)
   .use(remarkMath)
 
+// 把 TipTap 的扁平 marks 还原为 mdast 嵌套格式节点（逐层包裹）；
+// code mark 特殊：不能包裹，需把每个 text 就地转成 inlineCode。
 function marks(nodes: PhrasingContent[], markList: Mark[]): PhrasingContent[] {
   if (markList.length === 0) return nodes
   let current: PhrasingContent[] = nodes
@@ -94,6 +101,8 @@ function marks(nodes: PhrasingContent[], markList: Mark[]): PhrasingContent[] {
   return current
 }
 
+// 行内节点 → mdast；wiki/公式/嵌入是 mdast 不认识的自定义类型，
+// 用 as never 塞入，最终由上面的 customHandlers 负责输出
 function phrase(content: JSONContent[] | undefined): PhrasingContent[] {
   const result: PhrasingContent[] = []
   for (const node of content ?? []) {
@@ -139,6 +148,7 @@ function phrase(content: JSONContent[] | undefined): PhrasingContent[] {
   return result
 }
 
+// 文本节点需应用其 marks，其余行内节点直接映射
 function phraseWithMarks(content: JSONContent[] | undefined): PhrasingContent[] {
   const result: PhrasingContent[] = []
   for (const node of content ?? []) {
@@ -151,6 +161,7 @@ function phraseWithMarks(content: JSONContent[] | undefined): PhrasingContent[] 
   return result
 }
 
+// 三种列表统一映射为 mdast list；任务项通过 checked 布尔值表达（普通项为 null）
 function listBlock(node: JSONContent): List {
   const task = node.type === 'taskList'
   const items: ListItem[] = (node.content ?? []).map((item) => {
@@ -172,6 +183,7 @@ function listBlock(node: JSONContent): List {
   }
 }
 
+// 表格：从首行各单元格的 align 属性还原 GFM 对齐行；单元格只取第一个段落的行内内容
 function tableBlock(node: JSONContent): Table {
   const rows = node.content ?? []
   const headerCells = rows[0]?.content ?? []
@@ -189,6 +201,7 @@ function tableBlock(node: JSONContent): Table {
   return { type: 'table', align, children: tableRows }
 }
 
+// 块级节点 → mdast；未知类型保底降级为段落，避免内容丢失
 function blocks(content: JSONContent[]): RootContent[] {
   const result: RootContent[] = []
   for (const node of content) {
@@ -256,9 +269,9 @@ function blocks(content: JSONContent[]): RootContent[] {
 const FENCE_LINE = /^(\s*)(`{3,}|~{3,})/
 
 /**
- * remark-stringify escapes a line-leading `#` even when it is not followed by
- * a space, turning `#tag` into `\#tag`. The tag parser (and the on-disk format)
- * expect the plain form, so restore it outside fenced code blocks.
+ * remark-stringify 会把行首的 `#` 转义成 `\#`（即使后面没有空格），
+ * 但标签解析器与磁盘格式要求 `#tag` 的原始写法，因此在围栏代码块之外
+ * 把 `\#` 还原为 `#`；代码块内保持原样，且需匹配同种围栏字符才视为闭合。
  */
 function unescapeTagHashes(markdown: string): string {
   let fenced = false
@@ -283,12 +296,14 @@ function unescapeTagHashes(markdown: string): string {
     .join('\n')
 }
 
+// 出口：doc JSON → Markdown 文本；frontmatter 不经过序列化，直接拼回正文之前
 export function documentToMarkdown(doc: JSONContent, frontmatter = ''): string {
   const root: Root = { type: 'root', children: blocks(doc.content ?? []) }
   const body = unescapeTagHashes(serializer.stringify(root))
   return frontmatter ? `${frontmatter}${body}` : body
 }
 
+// 提取纯文本用于字数统计：跳过代码块与公式（不算正文文字）
 export function extractPlainText(doc: JSONContent): string {
   const parts: string[] = []
   const walk = (node: JSONContent, skip: boolean): void => {

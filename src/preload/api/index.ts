@@ -1,3 +1,4 @@
+// 汇总各模块桥接实现为 EasyNoteApi；显式标注类型确保实现与 shared 契约一致。
 import type { EasyNoteApi } from '@shared/contracts/api'
 import { blockApi } from './block'
 import { eventsApi } from './events'

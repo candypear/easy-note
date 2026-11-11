@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 大纲面板：标题由编辑器遍历 ProseMirror 文档收集后写入 workspace.headings，本组件只做展示；
+// 点击条目经 focusHeading 广播给编辑器定位滚动，空态按钮发"插入标题"信号（计数器）而非直接调用编辑器。
 import { useContext } from '../../../app/providers'
 import BaseButton from '../../../ui/button/BaseButton.vue'
 

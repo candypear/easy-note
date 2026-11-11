@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 通用输入框：严格受控（值只来自 modelValue，输入经 update:modelValue 回写），
+// 额外发 enter/escape 语义事件；暴露 focus() 供父组件主动聚焦。
 import { ref } from 'vue'
 import Icon from '../icons/Icon.vue'
 

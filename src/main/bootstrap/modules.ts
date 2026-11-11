@@ -1,3 +1,4 @@
+// 模块组合根：按依赖顺序实例化全部主进程模块并把 service 挂到 ctx.services，返回有序模块列表。
 import type { MainContext } from '@main/bootstrap/types'
 import type { MainModule } from '@main/bootstrap/types'
 import { createBlockModule } from '@main/modules/block'
@@ -13,6 +14,8 @@ import { createVaultModule } from '@main/modules/vault'
 import { createWindowModule } from '@main/modules/window'
 
 export function createModules(ctx: MainContext): MainModule[] {
+  // 装配顺序即依赖顺序：settings/vault 是基础，note/block/link/tag 依赖前者，
+  // search/indexer/graph 属于派生数据层放后面；每建好一个立即挂到 ctx.services 供后续模块使用
   const settings = createSettingsModule(ctx)
   ctx.services.settings = settings.service
   const vault = createVaultModule(ctx)

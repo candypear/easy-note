@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 右栏宿主：把注册的右栏标签（反向链接/大纲等）渲染为 BaseTabs，
+// 受控于 shell.rightTab 状态；找不到当前 id 时回退到第一个标签。
 import { computed } from 'vue'
 import { useContext } from '../../../app/providers'
 import Icon from '../../../ui/icons/Icon.vue'

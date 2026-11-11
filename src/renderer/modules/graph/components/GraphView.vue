@@ -1,10 +1,13 @@
 <script setup lang="ts">
+// 双链图谱视图：用 Canvas 2D 渲染力导向布局，支持全局/局部两种模式，
+// 以及滚轮缩放、画布平移、节点拖拽、悬停高亮邻居、点击节点跳转笔记。
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { GraphDataDTO, GraphNodeDTO } from '@shared/contracts/graph'
 import { asNoteId } from '@shared/types/brand'
 import { useContext } from '../../../app/providers'
 import Icon from '../../../ui/icons/Icon.vue'
 
+// 节点在图坐标系中的位置与速度（vx/vy 仅供力导向模拟迭代使用）
 interface Position {
   x: number
   y: number
@@ -21,13 +24,18 @@ const depth = ref(1)
 const hideOrphans = ref(false)
 const data = ref<GraphDataDTO>({ nodes: [], edges: [], truncated: false })
 const hoverId = ref<string | null>(null)
+// 刻意用普通 Map 而非响应式对象：模拟每轮高频写坐标，走 Vue 代理开销大；
+// 画面更新由各处显式调用 draw() 驱动，不依赖响应式追踪。
 const positions = new Map<string, Position>()
+// 视口变换：scale 缩放，tx/ty 平移（屏幕坐标 = 图坐标 * scale + t）
 const view = ref({ scale: 1, tx: 0, ty: 0 })
 let resizeObserver: ResizeObserver | null = null
+// 当前按压状态：id 为命中的节点（null 表示按在空白处→平移画布）；moved 区分点击与拖拽
 let dragging: { id: string | null; startX: number; startY: number; moved: boolean } | null = null
 let canvasWidth = 0
 let canvasHeight = 0
 
+// 隐藏孤立节点时，只保留至少出现在一条边端点上的节点
 const nodes = computed(() => {
   if (!hideOrphans.value) return data.value.nodes
   const connected = new Set<string>()
@@ -38,13 +46,16 @@ const nodes = computed(() => {
   return data.value.nodes.filter((node) => connected.has(node.id))
 })
 
+// 两端节点都可见的边才绘制，避免隐藏孤立节点后残留悬空连线
 const visibleEdges = computed(() => {
   const allowed = new Set(nodes.value.map((node) => node.id))
   return data.value.edges.filter((edge) => allowed.has(edge.source) && allowed.has(edge.target))
 })
 
+// 节点半径随连接数（degree）增大，封顶 18，避免枢纽节点过大遮挡画面
 const radiusOf = (node: GraphNodeDTO): number => Math.min(18, 6 + node.degree * 1.5)
 
+// 拉取图数据并重新布局：局部模式取当前笔记的 N 度邻居，无当前笔记时回退全局
 async function load(): Promise<void> {
   if (mode.value === 'local' && !ctx.workspace.currentNoteId) {
     mode.value = 'global'
@@ -56,11 +67,13 @@ async function load(): Promise<void> {
   if (result.ok) {
     data.value = result.data
     initPositions()
+    // 大图（>600 节点）只跑 40 轮减少同步阻塞，小图跑 240 轮让布局更收敛
     simulate(data.value.nodes.length > 600 ? 40 : 240)
     fit()
   }
 }
 
+// 初始位置按索引均匀撒在几圈同心圆上：避免全部叠在原点导致斥力爆炸、布局不稳定
 function initPositions(): void {
   positions.clear()
   const total = data.value.nodes.length
@@ -76,11 +89,15 @@ function initPositions(): void {
   })
 }
 
+// 简化版力导向布局（Fruchterman-Reingold 思路）：同步迭代若干轮一次性算完，
+// 不做逐帧动画，算完直接绘制，避免持续占用主线程。
 function simulate(iterations: number): void {
   const list = data.value.nodes
+  // 理想边长，同时作为斥力强度系数
   const key = 90
 
   for (let step = 0; step < iterations; step += 1) {
+    // 两两斥力是 O(n²)，超过 600 节点时跳过，只靠弹簧力+向心力近似布局
     if (list.length <= 600) {
       for (let i = 0; i < list.length; i += 1) {
         const a = positions.get(list[i]?.id ?? '')
@@ -90,7 +107,9 @@ function simulate(iterations: number): void {
           if (!b) continue
           const dx = a.x - b.x
           const dy = a.y - b.y
+          // 距离下限取 1，防止重合节点除零/斥力无穷大
           const distance = Math.max(1, Math.hypot(dx, dy))
+          // 斥力 ~ k²/d，方向沿两节点连线相互推开
           const force = (key * key) / distance
           const fx = (dx / distance) * force * 0.0015
           const fy = (dy / distance) * force * 0.0015
@@ -102,6 +121,7 @@ function simulate(iterations: number): void {
       }
     }
 
+    // 边的弹簧引力：把相连节点拉向理想间距 90
     for (const edge of data.value.edges) {
       const a = positions.get(edge.source)
       const b = positions.get(edge.target)
@@ -119,8 +139,10 @@ function simulate(iterations: number): void {
     }
 
     for (const [, position] of positions) {
+      // 向心引力：把节点往原点轻拉，防止不连通的子图越漂越远
       position.vx -= position.x * 0.0015
       position.vy -= position.y * 0.0015
+      // 速度阻尼 0.85 让系统逐渐收敛，再按速度积分更新位置
       position.vx *= 0.85
       position.vy *= 0.85
       position.x += position.vx
@@ -129,6 +151,7 @@ function simulate(iterations: number): void {
   }
 }
 
+// 取景：按可见节点的包围盒计算缩放与平移，让整张图居中铺满画布（留 80 边距）
 function fit(): void {
   if (nodes.value.length === 0) return
   let minX = Infinity
@@ -147,6 +170,7 @@ function fit(): void {
   const padding = 80
   const width = Math.max(1, maxX - minX + padding * 2)
   const height = Math.max(1, maxY - minY + padding * 2)
+  // 缩放上限 2.2：节点很少时不至于放大到失真
   const scale = Math.min(canvasWidth / width, canvasHeight / height, 2.2)
   const centerX = (minX + maxX) / 2
   const centerY = (minY + maxY) / 2
@@ -158,6 +182,7 @@ function fit(): void {
   draw()
 }
 
+// 屏幕（client）坐标 → 图坐标：减去画布偏移后做视口变换的逆变换
 function toGraph(clientX: number, clientY: number): { x: number; y: number } {
   const rect = canvas.value?.getBoundingClientRect()
   const left = rect?.left ?? 0
@@ -168,6 +193,7 @@ function toGraph(clientX: number, clientY: number): { x: number; y: number } {
   }
 }
 
+// 命中检测：返回指针下的节点；半径加 4px 容差，方便点中小节点
 function hitTest(clientX: number, clientY: number): GraphNodeDTO | null {
   const point = toGraph(clientX, clientY)
   for (const node of nodes.value) {
@@ -179,14 +205,17 @@ function hitTest(clientX: number, clientY: number): GraphNodeDTO | null {
   return null
 }
 
+// 全量重绘：无渲染循环，仅在数据/视口/悬停变化时按需调用
 function draw(): void {
   const element = canvas.value
   if (!element) return
   const dpr = window.devicePixelRatio || 1
   const context = element.getContext('2d')
   if (!context) return
+  // 按设备像素比设置变换，高分屏下文字和线条不模糊（画布物理尺寸见 resize）
   context.setTransform(dpr, 0, 0, dpr, 0, 0)
   context.clearRect(0, 0, canvasWidth, canvasHeight)
+  // 每次绘制都从 CSS 变量取色，主题切换后无需额外处理即可跟随新配色
   const styles = getComputedStyle(document.documentElement)
   const accent = styles.getPropertyValue('--accent').trim() || '#2f81f7'
   const border = styles.getPropertyValue('--border-strong').trim() || '#d0d0d0'
@@ -196,6 +225,7 @@ function draw(): void {
   context.fillRect(0, 0, canvasWidth, canvasHeight)
 
   context.save()
+  // 进入图坐标系：之后所有绘制直接用节点坐标，线宽/字号除以 scale 保持屏幕像素恒定
   context.translate(view.value.tx, view.value.ty)
   context.scale(view.value.scale, view.value.scale)
   context.lineWidth = 1 / view.value.scale
@@ -204,6 +234,7 @@ function draw(): void {
     const source = positions.get(edge.source)
     const target = positions.get(edge.target)
     if (!source || !target) continue
+    // 悬停时与悬停节点相连的边用强调色，其余边压暗以突出局部关系
     const highlighted =
       hoverId.value !== null && (edge.source === hoverId.value || edge.target === hoverId.value)
     context.strokeStyle = highlighted ? accent : border
@@ -218,6 +249,7 @@ function draw(): void {
   for (const node of nodes.value) {
     const position = positions.get(node.id)
     if (!position) continue
+    // 悬停时压暗非邻居节点；当前打开的笔记用文字色区别于其他节点的强调色
     const dim = hoverId.value !== null && hoverId.value !== node.id && !isNeighbor(node.id)
     context.globalAlpha = dim ? 0.3 : 1
     context.fillStyle = node.id === ctx.workspace.currentNoteId ? text : accent
@@ -225,6 +257,7 @@ function draw(): void {
     context.arc(position.x, position.y, radiusOf(node), 0, Math.PI * 2)
     context.fill()
     if (node.id === hoverId.value) {
+      // 悬停节点外再描一圈光环
       context.strokeStyle = accent
       context.lineWidth = 2 / view.value.scale
       context.beginPath()
@@ -234,6 +267,7 @@ function draw(): void {
     }
   }
 
+  // 标签只在悬停（仅悬停点及邻居）或放大到 1.3 倍且节点不超过 300 时显示，防止文字糊成一片
   const showLabels = hoverId.value !== null || (view.value.scale > 1.3 && nodes.value.length <= 300)
   if (showLabels) {
     context.globalAlpha = 1
@@ -249,6 +283,7 @@ function draw(): void {
   context.restore()
 }
 
+// 判断某节点是否与当前悬停节点直接相连（用于高亮邻居）
 function isNeighbor(id: string): boolean {
   if (!hoverId.value) return false
   return visibleEdges.value.some(
@@ -261,11 +296,13 @@ function isNeighbor(id: string): boolean {
 function onPointerDown(event: PointerEvent): void {
   const hit = hitTest(event.clientX, event.clientY)
   dragging = { id: hit?.id ?? null, startX: event.clientX, startY: event.clientY, moved: false }
+  // 捕获指针：拖出画布也能持续收到 move/up 事件，拖拽不中断
   canvas.value?.setPointerCapture(event.pointerId)
 }
 
 function onPointerMove(event: PointerEvent): void {
   if (!dragging) {
+    // 未按下时做悬停检测，仅在命中目标变化时重绘，避免每次移动都全量绘制
     const hit = hitTest(event.clientX, event.clientY)
     if (hit?.id !== hoverId.value) {
       hoverId.value = hit?.id ?? null
@@ -275,14 +312,17 @@ function onPointerMove(event: PointerEvent): void {
   }
   const dx = event.clientX - dragging.startX
   const dy = event.clientY - dragging.startY
+  // 位移超过 2px 才算拖拽，否则松手时按"点击节点"处理
   if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragging.moved = true
   if (dragging.id) {
+    // 拖节点：屏幕位移除以 scale 换算成图坐标位移
     const position = positions.get(dragging.id)
     if (position) {
       position.x += dx / view.value.scale
       position.y += dy / view.value.scale
     }
   } else {
+    // 拖空白：平移整个视口
     view.value = { ...view.value, tx: view.value.tx + dx, ty: view.value.ty + dy }
   }
   dragging.startX = event.clientX
@@ -291,6 +331,7 @@ function onPointerMove(event: PointerEvent): void {
 }
 
 function onPointerUp(event: PointerEvent): void {
+  // 按在节点上且未拖动 → 视为点击：打开该笔记并切回编辑器视图
   if (dragging && !dragging.moved && dragging.id) {
     ctx.workspace.openNote(dragging.id)
     ctx.shell.setWorkspaceView('editor')
@@ -299,6 +340,7 @@ function onPointerUp(event: PointerEvent): void {
   canvas.value?.releasePointerCapture(event.pointerId)
 }
 
+// 滚轮缩放：以鼠标位置为锚点，缩放前后光标下的图坐标点保持不动；范围 0.2~4 倍
 function onWheel(event: WheelEvent): void {
   event.preventDefault()
   const factor = event.deltaY < 0 ? 1.1 : 0.9
@@ -308,6 +350,7 @@ function onWheel(event: WheelEvent): void {
   const top = rect?.top ?? 0
   const x = event.clientX - left
   const y = event.clientY - top
+  // 由 "x = 图坐标 * scale + tx" 反解新的 tx/ty，实现锚点缩放
   view.value = {
     scale: nextScale,
     tx: x - ((x - view.value.tx) / view.value.scale) * nextScale,
@@ -333,9 +376,11 @@ function setDepth(next: number): void {
 
 function toggleOrphans(): void {
   hideOrphans.value = !hideOrphans.value
+  // 可见节点集合变了，下一帧重新取景适配新的包围盒
   requestAnimationFrame(fit)
 }
 
+// 画布尺寸跟随容器：物理像素 = CSS 尺寸 × dpr，配合 draw 里的 setTransform 保证清晰度
 function resize(): void {
   const element = wrap.value
   const target = canvas.value
@@ -356,11 +401,13 @@ onMounted(() => {
   if (wrap.value) resizeObserver.observe(wrap.value)
   resize()
   void load()
+  // 索引更新（笔记/链接变化）或切换 vault 后重新拉取图数据，保持图谱与库同步
   const off = ctx.events.on('index:updated', () => void load())
   const offVault = ctx.events.on('vault:changed', () => void load())
   stops.push(off, offVault)
 })
 
+// 局部图谱以当前笔记为中心，笔记切换时需要重载；全局图谱与当前笔记无关，不必刷新
 watch(
   () => ctx.workspace.currentNoteId,
   () => {
@@ -370,6 +417,7 @@ watch(
 
 const stops: (() => void)[] = []
 onBeforeUnmount(() => {
+  // 释放事件订阅与尺寸观察，避免离开视图后仍触发加载
   for (const stop of stops) stop()
   resizeObserver?.disconnect()
 })

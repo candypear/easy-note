@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 标签视图：展示全库标签及引用计数（聚合由主进程索引完成），支持多选标签
+// 按 and/or 组合筛选笔记，以及右键重命名/删除标签（会改写所有引用该标签的笔记）。
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { NoteSummary } from '@shared/contracts/note'
 import type { TagDTO, TagFilterMode } from '@shared/contracts/tag'
@@ -13,9 +15,11 @@ import { toast } from '../../../ui'
 const ctx = useContext()
 const { t } = ctx.i18n
 const tags = ref<TagDTO[]>([])
+// 已勾选的标签名集合与组合方式（and=全部命中，or=命中任一）
 const selected = ref<string[]>([])
 const mode = ref<TagFilterMode>('and')
 const results = ref<NoteSummary[]>([])
+// editing 为正在行内重命名的标签名（null 表示无），menu/confirm 为右键菜单与删除确认框状态
 const editing = ref<string | null>(null)
 const editingValue = ref('')
 const menu = ref({ open: false, x: 0, y: 0, name: '' })
@@ -31,6 +35,7 @@ async function loadTags(): Promise<void> {
   if (result.ok) tags.value = result.data
 }
 
+// 按当前勾选的标签筛选笔记；未勾选任何标签时清空结果而不发请求
 async function applyFilter(): Promise<void> {
   if (selected.value.length === 0) {
     results.value = []
@@ -40,6 +45,7 @@ async function applyFilter(): Promise<void> {
   if (result.ok) results.value = result.data.notes
 }
 
+// 点击标签行：切换勾选状态并立即重新筛选
 async function toggle(name: string): Promise<void> {
   const index = selected.value.indexOf(name)
   if (index >= 0) selected.value.splice(index, 1)
@@ -57,6 +63,7 @@ function clear(): void {
   results.value = []
 }
 
+// 右键标签行：在鼠标位置弹出重命名/删除菜单
 function openMenu(event: MouseEvent, name: string): void {
   event.preventDefault()
   menu.value = { open: true, x: event.clientX, y: event.clientY, name }
@@ -66,6 +73,7 @@ async function onMenuSelect(id: string): Promise<void> {
   const name = menu.value.name
   menu.value = { ...menu.value, open: false }
   if (id === 'rename') {
+    // 进入行内编辑：输入框预填原名
     editing.value = name
     editingValue.value = name
   } else if (id === 'delete') {
@@ -73,22 +81,26 @@ async function onMenuSelect(id: string): Promise<void> {
   }
 }
 
+// 提交重命名（回车或失焦触发）：主进程会同步改写所有笔记中的该标签
 async function submitRename(): Promise<void> {
   const oldName = editing.value
   const next = editingValue.value.trim()
   editing.value = null
+  // 空名或未改动直接退出，不发请求
   if (!oldName || !next || oldName === next) return
   const result = await ctx.api.tag.rename(oldName, next)
   if (!result.ok) {
     toast(t('menu.error', { message: result.error.message }), 'error')
     return
   }
+  // 勾选状态跟随迁移到新名，保持筛选结果连续，再刷新列表与结果
   const index = selected.value.indexOf(oldName)
   if (index >= 0) selected.value[index] = next
   await loadTags()
   await applyFilter()
 }
 
+// 确认删除：从所有笔记中移除该标签，成功后同步清掉勾选并刷新
 async function deleteTag(): Promise<void> {
   const name = confirm.value.name
   confirm.value = { open: false, name: '' }
@@ -103,6 +115,7 @@ async function deleteTag(): Promise<void> {
   await applyFilter()
 }
 
+// 打开结果笔记，并记入最近打开列表（供快速切换排序使用）
 function openNote(note: NoteSummary): void {
   ctx.workspace.openNote(note.id)
   void ctx.api.settings.addRecent(asNoteId(note.id))
@@ -111,6 +124,7 @@ function openNote(note: NoteSummary): void {
 const stops: (() => void)[] = []
 onMounted(() => {
   void loadTags()
+  // 索引更新（编辑笔记增删标签）后刷新计数；换 vault 则清空勾选重新加载
   stops.push(ctx.events.on('index:updated', () => void loadTags()))
   stops.push(
     ctx.events.on('vault:changed', () => {

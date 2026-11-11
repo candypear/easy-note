@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 行内公式 NodeView：点击切换为行内 input 编辑 LaTeX，输入实时写回节点属性；
+// 渲染结果由 KaTeX 生成，语法错误时以虚线下划线标记。
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { computed, nextTick, ref, type PropType } from 'vue'
 import { renderKatex } from './katex'
@@ -23,6 +25,7 @@ const input = ref<HTMLInputElement | null>(null)
 const latex = computed(() => String(props.node.attrs.latex ?? ''))
 const result = computed(() => renderKatex(latex.value, false))
 
+// 阻止冒泡避免 ProseMirror 把点击当作节点选中；等 input 挂载后再聚焦
 async function startEdit(event: MouseEvent): Promise<void> {
   event.stopPropagation()
   editing.value = true

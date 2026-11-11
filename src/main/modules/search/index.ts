@@ -1,3 +1,4 @@
+// 搜索模块：维护笔记全文索引，提供全文搜索（FTS5 优先、LIKE 降级）与快速切换笔记列表。
 import type { MainContext, MainModule } from '@main/bootstrap/types'
 import type { QuickSwitchHit, SearchHit } from '@shared/contracts/search'
 import { SearchChannels } from '@shared/contracts/search'
@@ -25,6 +26,7 @@ class SearchRepository {
     )
   }
 
+  // 普通表与 FTS 表双写：普通表保证 FTS5 不可用时 LIKE 降级仍可用
   upsert(noteId: string, title: string, plainText: string): void {
     this.db
       .prepare(
@@ -62,6 +64,7 @@ class SearchRepository {
   }
 }
 
+// 按空白拆词后逐个用双引号包裹并以 AND 连接，防止用户输入被解释为 FTS 查询语法
 const ftsExpression = (query: string): string =>
   query
     .split(/\s+/)
@@ -69,6 +72,7 @@ const ftsExpression = (query: string): string =>
     .map((term) => `"${term.replace(/"/g, '""')}"`)
     .join(' AND ')
 
+// LIKE 降级时手工截取摘要：命中位置前约 36、后约 48 个字符，两端加省略号
 const snippetAround = (text: string, query: string): string => {
   const normalized = text.replace(/\s+/g, ' ')
   const index = normalized.toLowerCase().indexOf(query.toLowerCase())
@@ -96,6 +100,8 @@ export class SearchService {
     this.repo().remove(noteId)
   }
 
+  // FTS 优先（trigram 分词要求查询至少 3 个字符），出错或无结果时降级 LIKE；
+  // bm25 值越小越相关，取负作为分数；另为每篇命中笔记定位首个命中块供跳转
   async search(query: string): Promise<SearchHit[]> {
     const trimmed = query.trim()
     if (!trimmed) return []
@@ -150,6 +156,7 @@ export class SearchService {
       .filter((row): row is SearchHit => row !== null)
   }
 
+  // 快速切换：标题子串匹配（空查询列出全部），最近打开的优先，其余按中文标题排序，最多 30 条
   async quickSwitch(query: string): Promise<QuickSwitchHit[]> {
     const notes = await this.ctx.services.note.listAll()
     const trimmed = query.trim().toLowerCase()
@@ -191,11 +198,12 @@ export const searchMigrations = [
         );
       `)
       try {
+        // trigram 分词器让 FTS5 支持中文与子串匹配（代价是查询需 ≥3 字符）
         db.exec(
           "CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(note_id UNINDEXED, title, plain_text, tokenize='trigram')"
         )
       } catch {
-        // FTS5 is unavailable in this SQLite build; LIKE search remains available.
+        // 当前 SQLite 构建不支持 FTS5；LIKE 搜索仍可用作降级方案。
       }
     }
   }

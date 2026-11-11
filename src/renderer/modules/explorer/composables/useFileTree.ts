@@ -1,3 +1,5 @@
+// 文件树动作集：增删改/移动/排序都经 API 委托主进程，成功后整树重载；
+// 展开状态持久化到 localStorage，跨会话保留浏览位置。
 import { asNoteId } from '@shared/types/brand'
 import type { ExplorerState } from '../stores/explorer-store'
 import type { RendererContext } from '../../../app/context'
@@ -28,6 +30,8 @@ export interface DragPayload {
   noteId: string | null
 }
 
+// 纯函数排序：按中文 locale 递归比较名称/标题，factor 控制升降序；
+// 全程拷贝数组与节点，不改动主进程返回的原始树结构
 function sortTree(tree: ExplorerState['tree'], asc: boolean): ExplorerState['tree'] {
   const factor = asc ? 1 : -1
   const sortFolders = (folders: ExplorerState['tree']['folders']): ExplorerState['tree']['folders'] =>
@@ -53,7 +57,7 @@ export function createTreeActions(ctx: RendererContext, state: ExplorerState): T
     try {
       localStorage.setItem(EXPANDED_KEY, JSON.stringify([...state.expanded]))
     } catch {
-      // storage may be unavailable
+      // localStorage 可能不可用（隐私模式/配额），静默降级为不持久化
     }
   }
 
@@ -64,6 +68,7 @@ export function createTreeActions(ctx: RendererContext, state: ExplorerState): T
   }
 
   const reload = async (): Promise<void> => {
+    // 一次性拉取整棵目录树；子节点在展开时才渲染（懒渲染而非按需加载数据）
     state.loading = true
     const result = await api.folder.tree()
     state.loading = false
@@ -79,10 +84,11 @@ export function createTreeActions(ctx: RendererContext, state: ExplorerState): T
         const values = JSON.parse(raw) as string[]
         for (const value of values) state.expanded.add(value)
       } catch {
-        // ignore corrupt value
+        // 存储值损坏时忽略，按全部折叠处理
       }
     },
     toggle(path) {
+      // 每次展开/折叠立即持久化，保证下次启动还原浏览位置
       if (state.expanded.has(path)) state.expanded.delete(path)
       else state.expanded.add(path)
       persistExpanded()
@@ -98,6 +104,7 @@ export function createTreeActions(ctx: RendererContext, state: ExplorerState): T
     },
     selectNote,
     openNote(noteId, path) {
+      // 选中态、工作区打开、最近列表三处联动；最近列表写入失败不影响打开
       selectNote(noteId, path)
       ctx.workspace.openNote(noteId)
       void api.settings.addRecent(asNoteId(noteId))
@@ -110,6 +117,7 @@ export function createTreeActions(ctx: RendererContext, state: ExplorerState): T
       }
       await reload()
       const note = result.data
+      // 展开新笔记所在文件夹并直接打开，让用户立即看到并编辑新文件
       if (note.folderPath) {
         state.expanded.add(note.folderPath)
         persistExpanded()
@@ -125,6 +133,8 @@ export function createTreeActions(ctx: RendererContext, state: ExplorerState): T
       }
     },
     async rename(kind, path, noteId, name) {
+      // 笔记按 id 走 note API、文件夹按路径走 folder API；
+      // 返回布尔值交由调用方（行内编辑）决定是否提示失败
       if (!name.trim()) return false
       const result =
         kind === 'note' && noteId
@@ -144,6 +154,7 @@ export function createTreeActions(ctx: RendererContext, state: ExplorerState): T
       return true
     },
     async moveNote(noteId, folderPath) {
+      // 拖拽移动：仅成功才重载，失败保持原树不动（主进程负责合法性校验）
       const result = await api.note.move(asNoteId(noteId), folderPath)
       if (result.ok) await reload()
     },
@@ -152,6 +163,7 @@ export function createTreeActions(ctx: RendererContext, state: ExplorerState): T
       if (result.ok) await reload()
     },
     toggleSort() {
+      // 只在内存中重排当前树，不重新请求主进程
       state.sortAsc = !state.sortAsc
       state.tree = sortTree(state.tree, state.sortAsc)
     }

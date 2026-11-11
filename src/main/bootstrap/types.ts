@@ -1,3 +1,4 @@
+// 引导层核心契约：定义模块接口（MainModule）与依赖注入上下文（MainContext），是模块与组合根间的边界。
 import type { BrowserWindow } from 'electron'
 import type { EasyNoteEventMap, EventName } from '@shared/contracts/events'
 import type { Migration } from '@main/platform/sqlite/migration-runner'
@@ -35,6 +36,7 @@ export interface MigrationRegistry {
   all(): Migration[]
 }
 
+// 模块统一接口：迁移与 IPC 在装配期同步注册，start/stop 为可选异步生命周期钩子（启动正序、退出逆序调用）
 export interface MainModule {
   id: string
   migrations: Migration[]
@@ -43,6 +45,7 @@ export interface MainModule {
   stop?(): Promise<void>
 }
 
+// 依赖注入上下文：模块只依赖此接口而非具体实现，平台能力均以 Port 形式暴露，便于测试替换
 export interface MainContext {
   paths: AppPaths
   db: SqliteDatabase

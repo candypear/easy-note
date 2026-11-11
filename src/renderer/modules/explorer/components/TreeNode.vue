@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 递归树节点：同一组件渲染文件夹或笔记（二选一 prop），展开时递归渲染子节点；
+// 重命名/右键/拖拽等交互只发事件，由 FileTree 容器集中裁决，自身不持业务状态。
 import { computed, nextTick, ref, watch, type PropType } from 'vue'
 import type { FolderNode } from '@shared/contracts/folder'
 import { asNoteId } from '@shared/types/brand'
@@ -18,6 +20,7 @@ const props = defineProps({
   dragTarget: { type: String as PropType<string | null>, default: null }
 })
 
+// 事件协议：子层 TreeNode 在模板中把这些事件原样转发，逐层冒泡到 FileTree
 const emit = defineEmits<{
   'update:editingValue': [value: string]
   'start-rename': [kind: 'folder' | 'note', path: string, noteId: string | null, name: string]
@@ -29,6 +32,7 @@ const emit = defineEmits<{
 }>()
 
 const input = ref<HTMLInputElement | null>(null)
+// 展开态取自共享的 expanded 集合而非本地状态，保证"折叠全部"等全局操作生效
 const expanded = computed(() => !!props.folder && props.state.expanded.has(props.folder.path))
 const isEditing = computed(() => props.editingPath === (props.folder?.path ?? props.note?.path ?? ''))
 
@@ -36,6 +40,7 @@ watch(
   isEditing,
   async (value) => {
     if (!value) return
+    // 等 input 渲染完成后聚焦并全选文件名，便于直接覆盖输入
     await nextTick()
     input.value?.focus()
     input.value?.select()
@@ -44,11 +49,13 @@ watch(
 )
 
 function toggleFolder(event: MouseEvent): void {
+  // 阻止冒泡，避免箭头点击同时触发行的选中逻辑
   event.stopPropagation()
   if (props.folder) props.actions.toggle(props.folder.path)
 }
 
 function onClick(): void {
+  // 单击文件夹只选中不展开（展开靠箭头/双击）；单击笔记直接打开
   if (props.folder) {
     props.state.selectedPath = props.folder.path
     props.state.selectedKind = 'folder'
@@ -59,6 +66,7 @@ function onClick(): void {
 }
 
 function onContext(event: MouseEvent): void {
+  // 右键先选中目标节点再上抛菜单事件，保证菜单动作作用于所指节点
   if (props.folder) {
     props.state.selectedPath = props.folder.path
     props.state.selectedKind = 'folder'
@@ -73,6 +81,7 @@ function onContext(event: MouseEvent): void {
 }
 
 function onKeydown(event: KeyboardEvent): void {
+  // 行聚焦时的键盘交互：F2 重命名、Enter 打开笔记
   if (event.key === 'F2') {
     event.preventDefault()
     if (props.folder) {
@@ -88,6 +97,7 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 function onRenameKeydown(event: KeyboardEvent): void {
+  // 编辑框内：Enter 提交、Esc 取消；失焦提交由模板 blur 绑定兜底
   if (event.key === 'Enter') {
     event.preventDefault()
     if (props.folder) emit('finish-rename', 'folder', props.folder.path, null)
@@ -97,6 +107,7 @@ function onRenameKeydown(event: KeyboardEvent): void {
 }
 
 function onDragStart(event: DragEvent): void {
+  // 用自定义 MIME 携带 JSON 载荷（类型/路径/id），与外部文件拖拽区分开
   const payload: DragPayload = props.folder
     ? { kind: 'folder', path: props.folder.path, noteId: null }
     : { kind: 'note', path: props.note?.path ?? '', noteId: props.note?.id ?? null }
@@ -105,6 +116,8 @@ function onDragStart(event: DragEvent): void {
 }
 
 function onDragOver(event: DragEvent): void {
+  // 只有文件夹能作为落点；preventDefault 表示接受放置，
+  // stopPropagation 防止冒泡到树根被当作"移到库根"
   if (!props.folder) return
   event.preventDefault()
   event.stopPropagation()
@@ -112,6 +125,7 @@ function onDragOver(event: DragEvent): void {
 }
 
 function onDrop(event: DragEvent): void {
+  // 解析载荷后上抛给容器执行移动；无论成败都清除落点高亮
   if (!props.folder) return
   event.preventDefault()
   event.stopPropagation()
@@ -121,7 +135,7 @@ function onDrop(event: DragEvent): void {
     const payload = JSON.parse(raw) as DragPayload
     emit('drop-item', payload, props.folder.path)
   } catch {
-    // ignore malformed payload
+    // 拖拽数据非法时忽略
   }
   emit('drag-target', null)
 }

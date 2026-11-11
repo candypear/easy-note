@@ -1,3 +1,5 @@
+// Vault 模块：负责笔记库目录的打开/切换，初始化 .easynote 内部目录与 SQLite 索引库，
+// 维护 vault 元数据；打开成功后广播 vault:changed 驱动索引器重新扫描。
 import { join, resolve } from 'node:path'
 import { nanoid } from 'nanoid'
 import type { MainContext, MainModule } from '@main/bootstrap/types'
@@ -76,6 +78,7 @@ export class VaultService {
     return this.ctx.dialog.pickFolder('选择笔记库文件夹')
   }
 
+  // 启动时自动恢复上次的 vault；目录不存在则静默跳过，打开失败则清空设置避免每次启动都报错
   async start(): Promise<void> {
     const target = this.ctx.services.settings.get().vaultPath
     if (!target) return
@@ -88,6 +91,7 @@ export class VaultService {
     }
   }
 
+  // 打开流程：校验目录与可写性 -> 切换数据库并跑迁移 -> 写元数据 -> 播种示例 -> 广播变更
   async open(path: string): Promise<VaultInfo> {
     const target = resolve(path)
     const stat = await this.ctx.fs.stat(target).catch(() => null)
@@ -96,6 +100,7 @@ export class VaultService {
 
     const internal = join(target, '.easynote')
     const temporary = join(internal, 'tmp')
+    // 用探针文件实际写一次来验证目录可写（仅靠 stat 权限位不可靠）
     try {
       await this.ctx.fs.mkdirp(temporary)
       const probe = join(internal, '.write-probe')
@@ -105,6 +110,7 @@ export class VaultService {
       throw new AppError('VAULT_WRITE_DENIED')
     }
 
+    // 先关旧库再打开新 vault 的 index.db；失败时关闭连接并报错，避免半初始化状态
     this.ctx.db.close()
     try {
       this.ctx.db.open(join(internal, 'index.db'))
@@ -115,6 +121,7 @@ export class VaultService {
     }
 
     this.repository = new VaultRepository(this.ctx.db)
+    // vault_id 持久化在库内：同一目录重复打开复用原 ID，便于前端识别是否同一个库
     const previous = this.repository.get('vault_id')
     const id = previous ?? nanoid(12)
     this.repository.set('vault_id', id)
@@ -131,10 +138,12 @@ export class VaultService {
 
     await this.seedSample()
     await this.ctx.services.settings.setVaultPath(target)
+    // 广播 vault:changed：索引器订阅该事件以切换文件监听并触发全量扫描
     this.ctx.events.publish('vault:changed', { vaultId: id, path: target })
     return this.current() ?? { id, path: target, name: 'EasyNote', openedAt: new Date().toISOString() }
   }
 
+  // 仅首次打开且库内没有任何 Markdown 时写入欢迎笔记；seeded 标记防止重复播种
   private async seedSample(): Promise<void> {
     if (!this.root || !this.repository) return
     const seeded = this.repository.get('seeded') === '1'

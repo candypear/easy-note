@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 顶栏：侧栏开关、面包屑、源码/主题/设置/右栏按钮；整条作为无边框窗口的
+// 拖拽区（drag-region），按钮用 no-drag 排除；macOS 留出系统红绿灯位置。
 import { computed, onMounted, ref } from 'vue'
 import { useContext } from '../../../app/providers'
 import BaseMenu, { type MenuItem } from '../../../ui/menu/BaseMenu.vue'
@@ -22,6 +24,7 @@ const themeItems = computed<MenuItem[]>(() => [
 ])
 
 const crumbs = computed(() => {
+  // 面包屑 = 库名 + 笔记所在目录层级（不含文件名）；图谱视图追加"关系图谱"
   const parts: string[] = [ctx.shell.state.vaultName]
   const path = ctx.workspace.currentNotePath
   if (path) {
@@ -33,6 +36,7 @@ const crumbs = computed(() => {
 })
 
 function openThemeMenu(): void {
+  // 以按钮位置锚定菜单：右缘对齐按钮右侧（菜单宽约 180px），下方留 4px 间距
   const rect = themeButton.value?.getBoundingClientRect()
   if (!rect) return
   themePosition.value = { x: rect.right - 180, y: rect.bottom + 4 }
@@ -42,6 +46,7 @@ function openThemeMenu(): void {
 function chooseTheme(id: string): void {
   themeOpen.value = false
   const mode = id as ThemeMode
+  // 先改本地状态让主题立即生效，再异步写入设置持久化，不阻塞交互
   ctx.shell.setThemeMode(mode)
   void ctx.api.settings.set({ theme: mode })
 }

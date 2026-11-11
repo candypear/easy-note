@@ -1,9 +1,12 @@
 <script setup lang="ts">
+// 侧栏宿主：渲染各模块注册的侧栏视图（文件/标签/搜索）为顶部标签，
+// 按 shell 状态切换当前视图组件；底部固定"关系图谱"入口。
 import { useContext } from '../../../app/providers'
 import Icon from '../../../ui/icons/Icon.vue'
 
 const ctx = useContext()
 const { t } = ctx.i18n
+// 注册发生在模块 install（挂载前），此处一次性读取即可，无需响应式
 const views = ctx.shell.registry.sidebar.views()
 
 function select(id: string): void {
@@ -11,6 +14,7 @@ function select(id: string): void {
 }
 
 function openGraph(): void {
+  // 同时切工作区服务视图与外壳视图 id，保证状态栏/顶栏与渲染组件一致
   ctx.workspace.openGraph()
   ctx.shell.setWorkspaceView('graph')
 }

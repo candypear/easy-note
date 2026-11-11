@@ -1,3 +1,4 @@
+// 渲染进程可见的总 API 契约：按模块聚合各子 API，preload 桥接与渲染端调用共用此类型。
 import type { BlockApi } from './block'
 import type { EventsApi } from './events'
 import type { FolderApi } from './folder'

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 笔记编辑器主组件：管理 TipTap 实例生命周期、Markdown 加载/防抖保存、源码模式切换，
+// 以及斜杠菜单、wiki 链接补全、块手柄/右键菜单、表格工具条、外部变更与块定位等交互。
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { EditorContent } from '@tiptap/vue-3'
 import type { Editor } from '@tiptap/vue-3'
@@ -67,6 +69,8 @@ const contextMenu = ref({
 })
 const tableSize = ref({ open: false, rows: '3', cols: '3', tablePos: 0 })
 
+// currentId：当前加载的笔记；saveTimer：防抖定时器；lastSaved：上次落盘内容，用于跳过无变化保存；
+// applying：程序化写入文档期间置 true，抑制 onUpdate 误标 dirty / 触发保存
 let currentId: string | null = null
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let lastSaved = ''
@@ -74,6 +78,7 @@ let applying = false
 
 const isEmpty = computed(() => !ctx.workspace.currentNoteId)
 
+// 从当前文档派生统计、大纲、纯文本，同步到 workspace 供状态栏/大纲/反链等模块使用
 function updateDerived(): void {
   const instance = editor.value
   if (!instance) return
@@ -91,11 +96,13 @@ function editorMarkdown(): string {
   return documentToMarkdown(instance.getJSON(), frontmatter.value)
 }
 
+// 取当前待保存文本：源码模式直接用 CodeMirror 的值，否则由文档序列化（带 frontmatter）
 function currentMarkdown(): string {
   if (ctx.workspace.sourceMode) return sourceValue.value
   return editorMarkdown()
 }
 
+// 立即保存：先取消待触发的防抖任务；与 lastSaved 相同则跳过 IPC，避免无谓写盘
 async function saveNow(): Promise<void> {
   if (!currentId) return
   if (saveTimer) {
@@ -117,6 +124,7 @@ async function saveNow(): Promise<void> {
   }
 }
 
+// 防抖保存：每次输入重置 500ms 计时，停止输入后才落盘
 function scheduleSave(): void {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => void saveNow(), 500)
@@ -127,6 +135,9 @@ function closeFlyouts(): void {
   wiki.value.open = false
 }
 
+// 检测光标前文本以触发斜杠菜单和 wiki 链接补全：
+// textBetween 用 \ufffc 占位原子节点（图片/公式等），防止把节点内容当普通文本匹配；
+// 斜杠要求位于行首或空白后，wiki 匹配未闭合的 [[ 或 ![[（后者为嵌入模式）。
 function checkTriggers(): void {
   const instance = editor.value
   if (!instance || ctx.workspace.sourceMode) {
@@ -141,6 +152,7 @@ function checkTriggers(): void {
   if (slashMatch && !wikiMatch) {
     const query = slashMatch[1] ?? ''
     const index = before.lastIndexOf('/')
+    // 用光标屏幕坐标定位菜单；start 记录斜杠的文档位置，供选中后删除 "/查询词"
     const coords = instance.view.coordsAtPos(instance.state.selection.from)
     slash.value = {
       open: true,
@@ -156,6 +168,7 @@ function checkTriggers(): void {
 
   if (wikiMatch) {
     const coords = instance.view.coordsAtPos(instance.state.selection.from)
+    // range 覆盖从 [[ 起到光标的整个触发文本，选中候选后整体替换为节点
     wiki.value = {
       open: true,
       x: coords.left,
@@ -170,6 +183,7 @@ function checkTriggers(): void {
   }
 }
 
+// TipTap 文档更新回调：程序化写入（applying）时跳过，否则标脏、刷新派生数据并防抖保存
 function onUpdate(): void {
   if (applying) return
   ctx.workspace.setSaveState('dirty')
@@ -178,6 +192,7 @@ function onUpdate(): void {
   scheduleSave()
 }
 
+// 把顶层块的序号（主进程索引用的 ordinal）换算为文档位置：累加前序兄弟的 nodeSize
 function posAtOrdinal(doc: PMNode, ordinal: number): number | null {
   if (ordinal < 0 || ordinal >= doc.childCount) return null
   let pos = 0
@@ -191,12 +206,15 @@ function blockAt(instance: Editor, pos: number): PMNode | null {
   return doc.nodeAt(pos)
 }
 
+// 从事件目标向上找编辑器根的直接子元素，即顶层块对应的 DOM
 function topLevelElement(root: HTMLElement, target: Element): Element | null {
   let el: Element | null = target
   while (el && el.parentElement !== root) el = el.parentElement
   return el === root ? null : el
 }
 
+// DOM 元素 → 顶层块位置：posAtDOM 可能落在块内部深层，用 resolve().before(1) 提升到顶层；
+// NodeView 等场景 posAtDOM 可能抛异常，需捕获返回 null
 function blockPosForElement(instance: Editor, el: Element): number | null {
   let pos: number
   try {
@@ -219,6 +237,7 @@ function blockPosAt(instance: Editor, target: Element): number | null {
   return blockPosForElement(instance, el)
 }
 
+// 若事件目标在表格单元格内，沿解析路径向上找 table 祖先，返回表位置与单元格内位置
 function tableContextAt(
   instance: Editor,
   target: Element
@@ -240,11 +259,13 @@ function tableContextAt(
   return null
 }
 
+// 以首行首格的对齐代表整表对齐（工具条按整表统一设置）
 function tableAlignOf(table: PMNode): TableAlign {
   const value = table.firstChild?.firstChild?.attrs.align
   return value === 'center' || value === 'right' ? value : 'left'
 }
 
+// 从选区推断所在表格：整表 NodeSelection 直接取 from，否则沿祖先链找 table
 function tablePosFromSelection(instance: Editor): number | null {
   const selection = instance.state.selection
   if (selection instanceof NodeSelection) {
@@ -258,6 +279,8 @@ function tablePosFromSelection(instance: Editor): number | null {
   return null
 }
 
+// 同步表格对齐工具条：定位到表格 DOM 右上角上方，夹在视口内；
+// 表格滚出可视区（顶部越过 48px 标题栏或底部超出窗口）时隐藏。
 function syncTableToolbar(forcePos?: number): void {
   const instance = editor.value
   if (!instance || ctx.workspace.sourceMode) {
@@ -295,6 +318,8 @@ function syncTableToolbar(forcePos?: number): void {
   tableToolbar.value = { pos, left, top, align: tableAlignOf(table) }
 }
 
+// 整表统一设置对齐：pos + 2 跳过 table 与首行 row 的起始 token，
+// 再加行/格在父节点内的偏移即为单元格位置；结束后保持整表选中以便工具条继续显示。
 function applyTableAlignment(align: TableAlign): void {
   const instance = editor.value
   const toolbar = tableToolbar.value
@@ -321,6 +346,7 @@ function onSelectionChange(): void {
   syncTableToolbar()
 }
 
+// 滚动时隐藏块手柄（位置已失效）并重新计算表格工具条坐标
 function onEditorScroll(): void {
   handle.value = null
   syncTableToolbar()
@@ -342,6 +368,7 @@ function focusCell(instance: Editor, cellPos: number): boolean {
   return true
 }
 
+// 给目标块加短暂高亮动画，用于跳转定位后的视觉反馈
 function flashBlock(pos: number): void {
   const instance = editor.value
   if (!instance) return
@@ -353,6 +380,8 @@ function flashBlock(pos: number): void {
   setTimeout(() => dom.classList.remove('block-flash'), 1500)
 }
 
+// 响应"定位到块"请求（如点击反链/嵌入跳转）：按块 ID 查主进程索引拿 ordinal，
+// 换算成文档位置后滚动并高亮；异步返回后校验编辑器/笔记/nonce 未变，防止过期请求生效。
 async function applyReveal(): Promise<void> {
   const target = ctx.workspace.reveal
   const instance = editor.value
@@ -375,6 +404,8 @@ async function applyReveal(): Promise<void> {
   flashBlock(pos)
 }
 
+// 加载笔记：切换前先把上一篇立即落盘，销毁旧编辑器实例，
+// 读取 Markdown 解析为 ProseMirror JSON 后重建编辑器；applying 防止初始化被当作编辑。
 async function load(noteId: string | null): Promise<void> {
   if (currentId && currentId !== noteId && editor.value) {
     await saveNow()
@@ -413,6 +444,7 @@ async function load(noteId: string | null): Promise<void> {
   ctx.workspace.currentNotePath = result.data.path
   await nextTick()
   applying = true
+  // setContent/创建期间的 onUpdate 不应标脏，因此用 applying 包住
   editor.value = createEditor({
     content: parsed.doc,
     placeholder: t('editor.placeholder'),
@@ -425,6 +457,8 @@ async function load(noteId: string | null): Promise<void> {
   void applyReveal()
 }
 
+// 外部冲突选择"加载磁盘"：重读文件并静默替换文档（setContent 第二参 false 不触发 update），
+// 同时刷新 lastSaved 基准，丢弃本地未保存修改。
 async function loadDisk(): Promise<void> {
   if (!currentId) return
   const result = await ctx.api.note.read(asNoteId(currentId))
@@ -441,10 +475,12 @@ async function loadDisk(): Promise<void> {
   external.value = false
 }
 
+// 选择"保留当前"：仅关闭提示条；本地内容仍是脏状态，下次保存会覆盖磁盘版本
 function keepCurrent(): void {
   external.value = false
 }
 
+// 鼠标悬停时计算块手柄位置（块左侧 30px）；同一块内移动不重复更新
 function onMouseMove(event: MouseEvent): void {
   const instance = editor.value
   if (!instance || ctx.workspace.sourceMode) {
@@ -482,6 +518,8 @@ function onHandleClick(): void {
   selectBlock(handle.value.pos)
 }
 
+// 右键菜单：块已整体选中（NodeSelection）时弹块菜单；
+// 否则若命中表格单元格则弹表格菜单；普通文本区域交给系统默认菜单。
 function onEditorContextMenu(event: MouseEvent): void {
   const instance = editor.value
   if (!instance || ctx.workspace.sourceMode) return
@@ -597,6 +635,8 @@ async function writeClipboard(text: string): Promise<void> {
   }
 }
 
+// 块类型转换：原子块（代码/公式/图片等）无法直接 setNode，
+// 先提取其文本替换为段落；转代码/公式则直接整块替换并搬运文本。
 function convertBlock(pos: number, kind: string): void {
   const instance = editor.value
   if (!instance) return
@@ -649,6 +689,8 @@ function openTableSize(tablePos: number): void {
   tableSize.value = { open: true, rows: String(rows), cols: String(cols), tablePos }
 }
 
+// 重建整表以调整行列数：保留已有单元格，新行以现有行（或末行）为模板
+// 复制行属性与表头类型，新增格子用 createAndFill 生成合法空单元格。
 function resizeTable(instance: Editor, tablePos: number, rows: number, cols: number): void {
   const table = blockAt(instance, tablePos)
   if (!table || table.type.name !== 'table') return
@@ -708,6 +750,7 @@ function runTableAction(
     return
   }
   if (cellPos === null) return
+  // TipTap 表格命令基于当前选区，先把光标放进右键命中的单元格再执行
   if (!focusCell(instance, cellPos)) return
   const chain = instance.chain().focus()
   if (action === 'rowBefore') chain.addRowBefore().run()
@@ -750,6 +793,7 @@ async function onMenuSelect(id: string): Promise<void> {
     return
   }
   if ((id === 'copyLink' || id === 'copyEmbed') && currentId) {
+    // 块 ID 可能尚未分配：按顶层序号请求主进程写回 ^id 并返回，再拼 [[标题#^id]] 引用
     const ordinal = instance.state.doc.resolve(pos).index(0)
     const assigned = await ctx.api.block.assign(asNoteId(currentId), ordinal)
     if (!assigned.ok) return
@@ -778,6 +822,8 @@ watch(
   { immediate: true }
 )
 
+// 源码模式切换：进入时把当前文档序列化为 Markdown 填入 CodeMirror；
+// 退出时重新解析源码并静默写回 TipTap，保证两个视图内容一致。
 watch(
   () => ctx.workspace.sourceMode,
   (enabled) => {
@@ -796,6 +842,7 @@ watch(
   }
 )
 
+// 源码模式下编辑走 v-model 而非 TipTap onUpdate，需单独标脏并防抖保存
 watch(sourceValue, () => {
   if (!ctx.workspace.sourceMode) return
   ctx.workspace.setSaveState('dirty')
@@ -824,6 +871,7 @@ onMounted(() => {
   window.addEventListener('resize', onResize)
   stops.push(() => window.removeEventListener('resize', onResize))
   stops.push(
+    // 主进程 watcher 检测到磁盘文件被外部修改：仅当前笔记受影响时显示冲突提示条
     ctx.events.on('note:external-change', ({ noteId }) => {
       if (noteId === currentId) external.value = true
     })
@@ -834,6 +882,8 @@ onMounted(() => {
     })
   )
   stops.push(
+    // 大纲点击跳转：缓存的 pos 可能因编辑失效，先校验该位置仍是同标题，
+    // 不匹配则按层级+文本全文搜索兜底。
     ctx.workspace.onFocusHeading((heading) => {
       const instance = editor.value
       if (!instance) return
@@ -871,6 +921,7 @@ watch(
 onBeforeUnmount(() => {
   for (const stop of stops) stop()
   if (saveTimer) clearTimeout(saveTimer)
+  // 卸载前强制落盘，避免防抖窗口内的最后编辑丢失
   void saveNow()
   editor.value?.destroy()
   editor.value = null

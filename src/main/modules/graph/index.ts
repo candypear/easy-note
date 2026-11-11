@@ -1,3 +1,5 @@
+// 图谱模块：把笔记间的链接关系聚合为图数据，提供全局图谱与以某笔记为中心的局部图谱。
+// 只读模块：数据来自 note 列表与 link 索引，自身不建表。
 import type { MainContext, MainModule } from '@main/bootstrap/types'
 import type { GraphDataDTO, GraphEdgeDTO, GraphNodeDTO } from '@shared/contracts/graph'
 import { GraphChannels } from '@shared/contracts/graph'
@@ -15,6 +17,8 @@ export class GraphService {
     return this.buildGraph(await this.ctx.services.note.listAll())
   }
 
+  // 局部图谱：把有向链接当作无向邻接做 BFS，按深度（限制 1~3 层）扩展，
+  // 只保留两端都在访问集合内的边
   async local(noteId: NoteId, depth: number): Promise<GraphDataDTO> {
     const notes = await this.ctx.services.note.listAll()
     const edges = this.ctx.services.link.edges()
@@ -45,6 +49,8 @@ export class GraphService {
     )
   }
 
+  // 汇总边并统计节点度数；超过上限时按度数降序保留重要节点并标记 truncated，
+  // 避免大图拖垮前端渲染
   private buildGraph(
     notes: NoteSummary[],
     sourceEdges?: { source: NoteId; target: NoteId }[]

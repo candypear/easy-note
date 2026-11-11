@@ -1,3 +1,5 @@
+// 工作区状态服务：以 reactive 单例承载当前笔记、保存状态与文档统计，
+// 供编辑器、状态栏、大纲等模块共享；"保存/查找"等命令用递增计数器广播。
 import { reactive } from 'vue'
 import type { Heading, RevealTarget, WorkspaceService } from './context'
 
@@ -42,9 +44,13 @@ export function createWorkspace(): Workspace {
     reveal: null
   })
 
+  // nonce 单调递增：即使重复打开同一笔记，reveal 引用也必然变化以触发编辑器定位
   let nonce = 0
+  // 大纲点击标题 → 编辑器滚动定位的监听集合，避免两模块直接互相引用
   const headingListeners = new Set<(heading: Heading) => void>()
 
+  // 用 getter/setter 把服务属性桥接到 reactive state，
+  // 使解构外的属性读写（含模板中）保持响应式
   return {
     state,
     get currentNoteId() {
@@ -129,6 +135,7 @@ export function createWorkspace(): Workspace {
       state.reveal = value
     },
     openNote(noteId, options) {
+      // 切换笔记即回到笔记视图并重置保存状态；定位参数随 reveal 一并下发
       nonce += 1
       state.currentNoteId = noteId
       state.view = 'note'
@@ -136,6 +143,7 @@ export function createWorkspace(): Workspace {
       state.reveal = { ...options, noteId, nonce }
     },
     closeNote() {
+      // 清空文档相关缓存，防止状态栏/大纲继续显示上一篇的数据
       state.currentNoteId = null
       state.currentNoteTitle = ''
       state.currentNotePath = ''
@@ -158,6 +166,8 @@ export function createWorkspace(): Workspace {
     notifyReveal(target) {
       state.reveal = target
     },
+    // 以下三个 request* 只递增计数器：编辑器 watch 计数变化执行动作，
+    // 用"信号"而非直接调用，保持快捷键/状态栏与编辑器实例解耦
     requestSave() {
       state.saveRequest += 1
     },

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 设置对话框：vault 切换、主题/字号（先改 UI 即时生效再异步持久化）、
+// 快捷键速查、重建索引与版本信息。
 import { onMounted, ref } from 'vue'
 import type { SettingsDTO, ThemeMode, FontSize } from '@shared/contracts/settings'
 import { formatRelativeTime } from '@shared/utils/date'
@@ -10,10 +12,12 @@ import Icon from '../../../ui/icons/Icon.vue'
 const ctx = useContext()
 const { t } = ctx.i18n
 const settings = ref<SettingsDTO | null>(null)
+// 构建时注入的应用版本号
 const appVersion = __APP_VERSION__
 const showShortcuts = ref(false)
 const rebuilding = ref(false)
 
+// 快捷键速查表（仅展示用）：组合键 → 说明文案的 i18n key
 const shortcuts: [string, string][] = [
   ['Ctrl+N', 'settings.shortcut.newNote'],
   ['Ctrl+K', 'settings.shortcut.quickSwitch'],
@@ -34,23 +38,28 @@ function close(): void {
   ctx.shell.closeOverlay()
 }
 
+// 增量持久化设置：以主进程返回的完整 DTO 覆盖本地，保证与磁盘上的真实值一致
 async function apply(patch: Partial<SettingsDTO>): Promise<void> {
   const result = await ctx.api.settings.set(patch)
   if (result.ok) settings.value = result.data
 }
 
+// 先更新 shell 响应式状态让主题立即切换，再异步写盘，避免 UI 等待 IPC 往返
 function setTheme(theme: ThemeMode): void {
   ctx.shell.setThemeMode(theme)
   void apply({ theme })
 }
 
+// 同主题：字号先作用于 shell 状态即时生效，再持久化
 function setFontSize(fontSize: FontSize): void {
   ctx.shell.state.fontSize = fontSize
   void apply({ fontSize })
 }
 
+// 换库流程：系统目录选择框 → 打开新 vault → 关闭旧笔记（旧库笔记在新库中无效）
 async function changeVault(): Promise<void> {
   const picked = await ctx.api.vault.pickFolder()
+  // 用户取消选择时 pickFolder 返回空，直接结束
   if (!picked.ok || !picked.data) return
   const result = await ctx.api.vault.open(picked.data)
   if (result.ok) {
@@ -59,6 +68,7 @@ async function changeVault(): Promise<void> {
   }
 }
 
+// 全量重建索引：rebuilding 防重入，完成后重新拉取设置以刷新"上次索引时间"
 async function rebuild(): Promise<void> {
   if (rebuilding.value) return
   rebuilding.value = true

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 选库欢迎页：未打开笔记库时替代主布局；默认建议路径来自后端，
+// 可经系统对话框换目录，打开成功后直接写 shell 状态切入主界面。
 import { computed, onMounted, ref } from 'vue'
 import { useContext } from '../../../app/providers'
 import BaseButton from '../../../ui/button/BaseButton.vue'
@@ -24,6 +26,7 @@ const title = computed(() => (ctx.shell.state.vaultPath ? t('vault.open') : t('v
 
 async function submit(): Promise<void> {
   const target = path.value.trim()
+  // busy 防重复提交；失败仅提示换路径，成功后同步库信息使外壳切换到主布局
   if (!target || busy.value) return
   busy.value = true
   error.value = ''

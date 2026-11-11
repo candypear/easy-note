@@ -1,3 +1,5 @@
+// 简体中文文案表：按 "模块.用途" 命名空间组织，{xxx} 为插值占位符；
+// as const 使 MessageKey 联合类型可由 key 自动推导，供编译期校验。
 export const zhCN = {
   'app.name': 'EasyNote',
   'app.untitled': '未命名',

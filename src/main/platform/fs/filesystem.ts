@@ -1,3 +1,5 @@
+// 文件系统端口：把 Node fs 能力收敛为接口，便于上层模块依赖注入与测试 mock。
+// 写入统一走原子写入；返回的 stat/readdir 结果为精简 DTO，不泄露原生 fs 对象。
 import { copyFile, mkdir, readFile, readdir, rename, rm, stat } from 'node:fs/promises'
 import type { Stats } from 'node:fs'
 import { writeAtomic } from './atomic-write'

@@ -1,3 +1,5 @@
+// 平台层统一错误类型：AppError 携带错误码，供 IPC 层映射为结构化错误返回渲染进程。
+// FALLBACK 为每个错误码提供默认中文文案，保证任何错误都有可展示的提示。
 import type { ErrorCode } from '@shared/contracts/errors'
 
 const FALLBACK: Record<ErrorCode, string> = {

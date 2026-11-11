@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 快速切换浮层（Ctrl+K）：按标题子串匹配笔记（匹配与排序在主进程完成，最近打开优先），
+// 空查询展示最近笔记；支持上下键循环选择、回车打开、Esc/点击遮罩关闭。
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { QuickSwitchHit } from '@shared/contracts/search'
 import { asNoteId } from '@shared/types/brand'
@@ -9,10 +11,12 @@ const ctx = useContext()
 const { t } = ctx.i18n
 const query = ref('')
 const results = ref<QuickSwitchHit[]>([])
+// 键盘高亮项在 flat 列表中的下标
 const active = ref(0)
 const input = ref<HTMLInputElement | null>(null)
 let timer: ReturnType<typeof setTimeout> | null = null
 
+// 按 recent 标志分组展示；flat 拼接顺序与模板渲染顺序一致，保证键盘下标与视觉位置对应
 const recent = computed(() => results.value.filter((item) => item.recent))
 const matches = computed(() => results.value.filter((item) => !item.recent))
 const flat = computed(() => [...recent.value, ...matches.value])
@@ -21,10 +25,12 @@ async function load(value: string): Promise<void> {
   const result = await ctx.api.search.quickSwitch(value)
   if (result.ok) {
     results.value = result.data
+    // 结果集变化后高亮回到第一项
     active.value = 0
   }
 }
 
+// 100ms 防抖：停顿后才发请求，减少连续输入时的 IPC 与列表刷新
 watch(query, (value) => {
   if (timer) clearTimeout(timer)
   timer = setTimeout(() => void load(value), 100)
@@ -34,6 +40,7 @@ function close(): void {
   ctx.shell.closeOverlay()
 }
 
+// 打开选中笔记并记入最近打开（影响下次空查询的排序），随后关闭浮层
 function open(item: QuickSwitchHit | undefined): void {
   if (!item) return
   ctx.workspace.openNote(item.noteId)
@@ -41,6 +48,7 @@ function open(item: QuickSwitchHit | undefined): void {
   close()
 }
 
+// 键盘导航：上下键取模实现首尾循环（Math.max 防止空列表除零），回车打开，Esc 关闭
 function onKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape') {
     event.preventDefault()
@@ -58,13 +66,16 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 onMounted(() => {
+  // 空查询先加载最近笔记，打开即有可选列表
   void load('')
   input.value?.focus()
+  // 捕获阶段监听 document：抢在编辑器/全局快捷键之前处理导航键
   document.addEventListener('keydown', onKeydown, true)
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', onKeydown, true)
+  // 清理未触发的防抖定时器，避免关闭后仍刷新结果
   if (timer) clearTimeout(timer)
 })
 </script>

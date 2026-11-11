@@ -1,3 +1,5 @@
+// 笔记模块：负责笔记 CRUD，磁盘上的 Markdown 文件是事实来源，SQLite notes 表只是元数据索引；
+// 保存/重命名/移动/删除时维护与索引器、链接、文件夹的一致性并广播事件。
 import { join } from 'node:path'
 import { nanoid } from 'nanoid'
 import type { MainContext, MainModule } from '@main/bootstrap/types'
@@ -125,6 +127,7 @@ const headingText = (line: string): string | null => {
   return match ? (match[2] ?? '') : null
 }
 
+// 重命名时仅当正文首个标题与旧标题完全一致才同步改写，保持标题与文件名一致且不破坏用户内容
 const replaceFirstHeading = (content: string, oldTitle: string, newTitle: string): string => {
   const lines = content.split(/\r?\n/)
   const index = lines.findIndex((line) => headingText(line) !== null)
@@ -211,6 +214,8 @@ export class NoteService {
     }
   }
 
+  // 保存流程：路径锁防并发 + 内部写入标记防 watcher 误判外部修改；
+  // 原子写文件后更新元数据，再同步重建索引，最后广播保存事件
   async save(noteId: NoteId, content: string): Promise<NoteSaveResult> {
     const { root, repository } = this.requireRoot()
     const row = this.getRow(noteId)
@@ -229,6 +234,7 @@ export class NoteService {
           modifiedAt
         })
         try {
+          // 索引失败不阻塞保存：文件已落盘，索引可由后续扫描修复
           await this.ctx.services.indexer.indexNote(noteId, content)
         } catch (error) {
           this.ctx.logger.error(`保存后建立索引失败 ${row.path}`, error)
@@ -250,6 +256,7 @@ export class NoteService {
     if (folder) await this.ctx.services.folder.ensureExists(folder)
     const base = sanitizeName(title?.trim() || '未命名')
     const unique = await this.uniqueNotePath(folder, base)
+    // 新笔记自带与标题一致的一级标题，保证重命名时首标题联动逻辑可用
     const content = `# ${unique.title}\n\n`
     const absolute = resolveInVault(root, unique.path)
     await this.ctx.fs.writeFileAtomic(absolute, content)
@@ -285,6 +292,7 @@ export class NoteService {
     return this.toSummary(row)
   }
 
+  // 重命名 = 磁盘改名 + 更新笔记记录与 file_state + 同步正文首标题 + relink 更新所有 wiki 引用
   async rename(noteId: NoteId, title: string): Promise<NoteSummary> {
     const { root, repository } = this.requireRoot()
     const row = this.getRow(noteId)
@@ -322,6 +330,7 @@ export class NoteService {
     return this.toSummary(this.getRow(noteId))
   }
 
+  // 移动只改路径不改标题，wiki 链接按标题解析，因此无需更新链接
   async move(noteId: NoteId, folderPath: string | null): Promise<NoteSummary> {
     const { root, repository } = this.requireRoot()
     const row = this.getRow(noteId)
@@ -367,6 +376,7 @@ export class NoteService {
     return this.toSummary(newRow)
   }
 
+  // 文件移入系统回收站而非永久删除，随后清理索引记录
   async delete(noteId: NoteId): Promise<void> {
     const { root } = this.requireRoot()
     const row = this.getRow(noteId)
@@ -375,6 +385,7 @@ export class NoteService {
     this.ctx.events.publish('note:deleted', { noteId })
   }
 
+  // 级联清理块/链接/标签/全文索引；指向该笔记的入链由 link 模块置为失效
   async deleteRecords(noteId: NoteId): Promise<void> {
     const { repository } = this.requireRoot()
     const row = repository.byId(noteId)
@@ -395,6 +406,7 @@ export class NoteService {
     }
   }
 
+  // 扫描/监听时调用：按路径 upsert 笔记记录，同路径复用旧 ID，保证外部改动不改变笔记身份
   ensureFromDisk(path: string, content: string, stat: { mtimeMs: number; size: number }): NoteRow {
     const { repository } = this.requireRoot()
     const relative = normalizeRelative(path)
@@ -439,6 +451,7 @@ export class NoteService {
     )
   }
 
+  // 文件夹重命名/移动后批量改写该前缀下笔记的路径与所属文件夹，并广播索引更新
   async rebasePaths(oldPrefix: string, newPrefix: string): Promise<void> {
     const { repository } = this.requireRoot()
     const rows = repository
@@ -460,6 +473,7 @@ export class NoteService {
     }
   }
 
+  // 重读前缀下所有文件并重建内容索引；单文件失败只记日志，不中断整体流程
   async reindexPrefix(prefix: string): Promise<void> {
     const { root, repository } = this.requireRoot()
     const rows = repository.listByPrefix(normalizeRelative(prefix))
@@ -473,6 +487,7 @@ export class NoteService {
     }
   }
 
+  // 文件名冲突时自动追加 " 2"、" 3"… 序号；ignorePath 允许重命名/移动时保留自身原路径
   private async uniqueNotePath(
     folder: string,
     base: string,

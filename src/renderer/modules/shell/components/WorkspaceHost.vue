@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 工作区宿主：按 shell.workspaceView 在注册的视图（编辑器/图谱）间切换，
+// id 无效时回退到第一个注册视图，避免状态与注册表不一致导致空白。
 import { computed } from 'vue'
 import { useContext } from '../../../app/providers'
 

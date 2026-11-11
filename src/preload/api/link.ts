@@ -1,3 +1,4 @@
+// 双链模块桥接：把 LinkApi 调用转发到对应 IPC 通道。
 import type { LinkApi } from '@shared/contracts/link'
 import { LinkChannels } from '@shared/contracts/link'
 import { invoke } from './invoke'

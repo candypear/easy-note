@@ -1,3 +1,4 @@
+// 标签模块桥接：把 TagApi 调用转发到对应 IPC 通道。
 import type { TagApi } from '@shared/contracts/tag'
 import { TagChannels } from '@shared/contracts/tag'
 import { invoke } from './invoke'

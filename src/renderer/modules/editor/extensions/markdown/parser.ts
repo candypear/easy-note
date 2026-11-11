@@ -1,3 +1,5 @@
+// Markdown → ProseMirror JSON 解析器：基于 remark（GFM + math）生成 mdast，
+// 再手工映射为 TipTap 节点；wiki 链接/块引用在文本层用正则识别，frontmatter 原样保留。
 import type { JSONContent } from '@tiptap/core'
 import type {
   Blockquote,
@@ -43,6 +45,7 @@ type Mark = NonNullable<JSONContent['marks']>[number]
 
 const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath)
 
+// WIKI：匹配 [[目标]] 与 ![[目标]]（嵌入）；EMBED_ONLY：整段仅为一个嵌入时升级为块级嵌入
 const WIKI = /(!?)\[\[([^\]\n]+)\]\]/g
 const EMBED_ONLY = /^!\[\[([^\]\n]+)\]\]$/
 
@@ -55,6 +58,9 @@ function text(value: string, marks: Mark[] = []): JSONContent {
   return marks.length > 0 ? { type: 'text', text: value, marks } : { type: 'text', text: value }
 }
 
+// 把文本按 wiki 语法切分为普通文本与链接节点：
+// [[笔记#^块]] → blockRef，[[笔记]] → wikiLink，![[...]] → embedInline；
+// 普通文本片段继承外层 marks（加粗等格式内的 wiki 链接仍保留格式）。
 function splitWiki(value: string, marks: Mark[]): JSONContent[] {
   const result: JSONContent[] = []
   let last = 0
@@ -92,6 +98,8 @@ function splitWiki(value: string, marks: Mark[]): JSONContent[] {
   return result
 }
 
+// 行内 mdast → TipTap：格式节点（strong/em 等）转成 marks 递归下传；
+// 图片/行内公式为原子节点；未识别类型降级取 value 文本或递归 children，保证内容不丢。
 function inline(nodes: PhrasingContent[], marks: Mark[] = []): JSONContent[] {
   const result: JSONContent[] = []
   for (const node of nodes) {
@@ -113,6 +121,7 @@ function inline(nodes: PhrasingContent[], marks: Mark[] = []): JSONContent[] {
         break
       case 'link': {
         const link = node as Link
+        // 沿用现有映射：mdast 的 title 存入 link mark 的 target 属性
         const linkMark: Mark = {
           type: 'link',
           attrs: { href: link.url, target: link.title ?? null }
@@ -148,12 +157,15 @@ function inline(nodes: PhrasingContent[], marks: Mark[] = []): JSONContent[] {
   return result
 }
 
+// 块级 mdast → TipTap 节点；yaml/definition 等不支持的块直接丢弃，
+// 其余未知块保底转为 htmlBlock 保留原文。
 function blocks(nodes: RootContent[]): JSONContent[] {
   const result: JSONContent[] = []
   for (const node of nodes) {
     switch (node.type) {
       case 'paragraph': {
         const paragraph = node as Paragraph
+        // 整段只含 ![[笔记#^块]] 时升级为块级嵌入 embedBlock，否则按普通段落解析
         const onlyText =
           paragraph.children.length === 1 && paragraph.children[0]?.type === 'text'
             ? (paragraph.children[0] as Text).value.trim()
@@ -221,6 +233,8 @@ function blocks(nodes: RootContent[]): JSONContent[] {
   return result
 }
 
+// mdast 一个 list 可混合普通项与任务项，而 TipTap 的 taskList/bulletList 不能混排：
+// 按 checked 有无切成连续分组，各自生成列表；有序列表的 start 按累计项数偏移，保持编号连续。
 function listBlocks(list: List): JSONContent[] {
   const groups: { task: boolean; items: ListItem[] }[] = []
   for (const item of list.children) {
@@ -260,6 +274,7 @@ function tableCell(cell: TableCell, header: boolean, align: string | null | unde
   }
 }
 
+// 表格：首行作表头，列对齐来自 GFM 的 align 数组；单元格内容包一层段落满足 schema
 function tableBlock(table: Table): JSONContent {
   const rows = table.children.map((row: TableRow, index) =>
     ({
@@ -272,6 +287,7 @@ function tableBlock(table: Table): JSONContent {
   return { type: 'table', content: rows }
 }
 
+// 入口：先剥离 frontmatter（不参与解析，保存时原样拼回），正文解析后映射为 doc JSON
 export function markdownToDocument(markdown: string): ParsedDocument {
   const { prefix, body } = splitFrontmatter(markdown)
   const tree = parser.parse(body) as Root

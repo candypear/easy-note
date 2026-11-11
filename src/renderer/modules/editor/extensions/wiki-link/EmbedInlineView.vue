@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 行内嵌入 NodeView（段落内混排的 ![[...]]）：显示轻量链接胶囊，
+// 点击时实时解析目标块并跳转到源笔记定位。
 import { computed, type PropType } from 'vue'
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { useContext } from '../../../../app/providers'

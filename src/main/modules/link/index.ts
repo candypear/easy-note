@@ -1,3 +1,5 @@
+// 链接模块：解析并维护 [[wiki]]/块引用/嵌入关系，提供反向链接、未链接提及及其转换，
+// 并在笔记重命名时批量更新源笔记中的链接文本。
 import { nanoid } from 'nanoid'
 import type { MainContext, MainModule } from '@main/bootstrap/types'
 import type { BlockDTO } from '@shared/contracts/block'
@@ -103,6 +105,7 @@ class LinkRepository {
       .all()
   }
 
+  // 删除笔记时：出链直接清除；入链保留原始文本但置为未解析（失效链接）
   removeForNote(noteId: string): void {
     this.db.transaction(() => {
       this.db.prepare('DELETE FROM links WHERE source_note_id = ?').run(noteId)
@@ -123,6 +126,8 @@ export class LinkService {
     return this.repository
   }
 
+  // 全量重建本笔记的出链：跳过代码/公式块避免误解析；
+  // 未解析的链接也保留原文与上下文，目标笔记创建后由 resolveAll 补齐
   sync(noteId: NoteId, blocks: BlockDTO[]): void {
     const repository = this.repo()
     repository.deleteBySource(noteId)
@@ -175,6 +180,7 @@ export class LinkService {
       .filter((row): row is NonNullable<typeof row> => row !== null)
   }
 
+  // 在其它笔记中查找对本笔记标题的纯文本提及（尚未成链接）；标题过短易误报，直接跳过
   async unlinked(noteId: NoteId): Promise<UnlinkedMentionDTO[]> {
     const note = this.ctx.services.note.getRow(noteId)
     const title = note.title
@@ -200,6 +206,7 @@ export class LinkService {
     return result
   }
 
+  // 把一处提及文本替换为 [[标题]]，走笔记保存流程以自动重建索引
   async convertMention(
     sourceNoteId: NoteId,
     sourceBlockId: string,
@@ -217,6 +224,7 @@ export class LinkService {
     return saved.meta
   }
 
+  // 批量转换：按源笔记分组，一次读写完成同一笔记内的所有替换
   async convertAll(noteId: NoteId): Promise<{ converted: number }> {
     const mentions = await this.unlinked(noteId)
     if (mentions.length === 0) return { converted: 0 }
@@ -239,6 +247,7 @@ export class LinkService {
       }
       if (ranges.length === 0) continue
       let content = note.content
+      // 去重后从后往前替换，避免前面的替换使后续字符偏移失效
       const unique = ranges
         .filter(
           (range, index) =>
@@ -254,6 +263,8 @@ export class LinkService {
     return { converted }
   }
 
+  // 笔记重命名后：先用 LIKE 粗筛 raw_text 含旧标题的源笔记，
+  // 再精确替换 wiki 目标并保存（触发重索引），最后全量重解析链接
   async relink(oldTitle: string, newTitle: string): Promise<void> {
     if (oldTitle === newTitle) return
     const sources = this.repo().sourcesByFragment(oldTitle)
@@ -267,6 +278,8 @@ export class LinkService {
     this.resolveAll()
   }
 
+  // 全量重解析所有链接的目标（重命名/删除/扫描后调用）；
+  // 缓存标题解析结果减少重复查询，事务内批量更新
   resolveAll(): void {
     const repository = this.repo()
     const rows = repository.all()
@@ -298,6 +311,7 @@ export class LinkService {
     this.repo().removeForNote(noteId)
   }
 
+  // 同方向的重复链接合并为一条边，供图谱使用
   edges(): { source: NoteId; target: NoteId }[] {
     const merged = new Map<string, { source: NoteId; target: NoteId }>()
     for (const edge of this.repo().edges()) {
@@ -324,6 +338,8 @@ export class LinkService {
     }
   }
 
+  // 定位提及在全文中的字符区间：优先用块 markdown 精确匹配；
+  // 匹配不到（索引与磁盘内容有偏差）时退回按块起止行号估算偏移
   private findMentionRange(
     content: string,
     block: BlockDTO,

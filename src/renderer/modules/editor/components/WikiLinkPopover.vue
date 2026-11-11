@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// [[ 触发的 wiki 链接补全弹层：防抖调用快速切换搜索接口列出候选笔记，
+// 支持键盘选择、新建笔记，以及嵌入模式（插入目标笔记首块的块嵌入）。
 import { computed, onBeforeUnmount, onMounted, ref, watch, type PropType } from 'vue'
 import type { Editor } from '@tiptap/core'
 import type { QuickSwitchHit } from '@shared/contracts/search'
@@ -28,6 +30,7 @@ let timer: ReturnType<typeof setTimeout> | null = null
 
 const top = computed(() => Math.max(8, Math.min(props.y, window.innerHeight - 360)))
 const left = computed(() => Math.max(8, Math.min(props.x, window.innerWidth - 328)))
+// 查询词非空且没有同名笔记时，追加"创建新笔记"选项
 const canCreate = computed(
   () =>
     props.query.trim().length > 0 &&
@@ -41,6 +44,7 @@ async function search(query: string): Promise<void> {
   if (result.ok) results.value = result.data.slice(0, 8)
 }
 
+// 查询词变化 120ms 防抖搜索，避免每敲一个字符都发 IPC 请求
 watch(
   () => [props.open, props.query] as const,
   ([open, query]) => {
@@ -51,6 +55,7 @@ watch(
   { immediate: true }
 )
 
+// 用 wikiLink 节点整体替换触发区间（[[查询词），尾随空格便于继续输入
 function insert(title: string, noteId: string | null): void {
   if (!props.editor || !props.range) return
   const range = props.range
@@ -67,6 +72,7 @@ function insert(title: string, noteId: string | null): void {
   emit('close')
 }
 
+// 嵌入模式：取目标笔记的第一个块作为嵌入目标；笔记无块时直接关闭不插入
 async function onEmbed(noteId: string, title: string): Promise<void> {
   const blocks = await ctx.api.block.listByNote(asNoteId(noteId))
   const first = blocks.ok ? blocks.data[0] : undefined
@@ -85,6 +91,8 @@ async function onEmbed(noteId: string, title: string): Promise<void> {
   emit('close')
 }
 
+// item 为 null 表示选中"创建"项：先建笔记再插入链接并打开；
+// undefined 表示无效选择（无结果且不可创建），直接忽略
 async function select(item: QuickSwitchHit | null | undefined): Promise<void> {
   if (item) {
     insert(item.title, item.noteId)
@@ -100,6 +108,8 @@ async function select(item: QuickSwitchHit | null | undefined): Promise<void> {
   }
 }
 
+// 键盘导航以捕获阶段监听，抢在编辑器处理前拦截上下键/Enter/Esc；
+// 可选项总数 = 搜索结果 + 可能的"创建"项
 function onKeydown(event: KeyboardEvent): void {
   if (!props.open) return
   const total = results.value.length + (canCreate.value ? 1 : 0)

@@ -1,3 +1,4 @@
+// 笔记模块桥接：把 NoteApi 调用转发到对应 IPC 通道，单参数直接传值、多参数打包为对象。
 import type { NoteApi } from '@shared/contracts/note-api'
 import { NoteChannels } from '@shared/contracts/note-api'
 import { invoke } from './invoke'

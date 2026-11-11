@@ -1,3 +1,5 @@
+// 全局 toast 队列：模块级 reactive 单例，任何地方调用 toast() 即可提示，
+// 由挂在应用外壳的 ToastHost 统一渲染；错误提示停留更久便于阅读。
 import { reactive } from 'vue'
 
 export interface ToastItem {

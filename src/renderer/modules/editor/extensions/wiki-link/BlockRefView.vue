@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 块引用 NodeView（[[笔记#^块]]）：显示"笔记 · 块"标签，
+// 点击解析块位置后打开目标笔记并触发块定位高亮。
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { computed, type PropType } from 'vue'
 import { useContext } from '../../../../app/providers'
@@ -22,6 +24,7 @@ const note = computed(() => String(props.node.attrs.note ?? ''))
 const blockId = computed(() => String(props.node.attrs.blockId ?? ''))
 const label = computed(() => `${note.value} · 块`)
 
+// openNote 附带 blockId，由 NoteEditor 的 reveal 流程滚动定位并闪烁目标块
 async function open(event: MouseEvent): Promise<void> {
   event.stopPropagation()
   event.preventDefault()

@@ -1,3 +1,5 @@
+// 块模块：维护笔记块在 SQLite 中的索引，负责块 ID 的稳定生成与定位，
+// 对外提供块列表、按序号取块 ID、块引用解析、折叠状态与未链接提及搜索。
 import { nanoid } from 'nanoid'
 import type { MainContext, MainModule } from '@main/bootstrap/types'
 import type { BlockDTO, BlockMentionDTO, BlockRefDTO, BlockType } from '@shared/contracts/block'
@@ -104,6 +106,7 @@ class BlockRepository {
       )
   }
 
+  // 软删除：被链接引用的块置为失效但保留 block_id，供前端展示失效引用
   invalidate(blockId: string): void {
     this.db.prepare('UPDATE blocks SET valid = 0 WHERE block_id = ?').run(blockId)
   }
@@ -122,6 +125,7 @@ class BlockRepository {
       .run(collapsed ? 1 : 0, blockId)
   }
 
+  // 用 LIKE 搜索纯文本包含指定文字的有效块（排除当前笔记），供“未链接提及”检测
   searchMentions(text: string, excludeNoteId: string, limit: number): BlockRow[] {
     return this.db
       .prepare<BlockRow>(
@@ -131,6 +135,7 @@ class BlockRepository {
   }
 }
 
+// 去空白后切分为二元组（bigram）：无需中文分词即可用于块内容模糊匹配
 const bigrams = (value: string): Set<string> => {
   const normalized = value.replace(/\s+/g, '')
   const result = new Set<string>()
@@ -144,6 +149,7 @@ const bigrams = (value: string): Set<string> => {
   return result
 }
 
+// Dice 系数衡量两段文本的相似度，取值 0~1
 const similarity = (left: string, right: string): number => {
   if (left === right) return 1
   if (!left || !right) return 0
@@ -164,9 +170,12 @@ export class BlockService {
     return this.repository
   }
 
+  // 笔记解析后增量同步块索引：尽量复用旧块 ID，避免编辑正文导致块引用断裂。
+  // 策略：先按内容哈希精确配对，再按二元组相似度模糊配对，仍未配对的旧块软删除。
   sync(noteId: NoteId, parsed: ParsedBlock[]): void {
     const repository = this.repo()
     const old = repository.validByNote(noteId)
+    // 被链接引用的块 ID：配对时优先保留，且永不物理删除
     const referenced = this.ctx.services.link.referencedBlockIds(noteId)
     const used = new Set<string>()
     const matches = new Array<BlockRow | null>(parsed.length).fill(null)
@@ -177,6 +186,8 @@ export class BlockService {
       oldByHash.set(row.content_hash, list)
     }
 
+    // 第一轮：内容哈希（空白归一化后 sha256）完全一致才配对；
+    // 同哈希多个候选时优先被引用的块，其次取序号最接近的，减少 ID 漂移
     parsed.forEach((block, index) => {
       const hash = block.plainText ? sha256(normalizeWhitespace(block.plainText)) : ''
       const candidates = (oldByHash.get(hash) ?? [])
@@ -193,6 +204,8 @@ export class BlockService {
       }
     })
 
+    // 第二轮：内容被小幅编辑的块按相似度配对（仅限同类型）；
+    // 与上一匹配块相邻的候选降低阈值并加分，被引用的块也加分
     parsed.forEach((block, index) => {
       if (matches[index]) return
       const previous = index > 0 ? (matches[index - 1] ?? null) : null
@@ -212,6 +225,7 @@ export class BlockService {
       }
     })
 
+    // 事务内统一写库：匹配到的块原地更新（保留 block_id），新块分配 nanoid
     this.ctx.db.transaction(() => {
       parsed.forEach((block, index) => {
         const hash = block.plainText ? sha256(normalizeWhitespace(block.plainText)) : ''
@@ -249,6 +263,7 @@ export class BlockService {
           valid: 1
         })
       })
+      // 未配对的旧块：一律标记失效；未被引用的物理删除，被引用的保留作失效引用
       for (const row of old) {
         if (used.has(row.block_id)) continue
         repository.invalidate(row.block_id)
@@ -263,12 +278,14 @@ export class BlockService {
       .map((row) => this.toDto(row))
   }
 
+  // 渲染进程只知道块在文档中的序号，通过此方法换取稳定的 block_id
   assign(noteId: NoteId, ordinal: number): { blockId: string; ordinal: number } {
     const row = this.repo().byOrdinal(noteId, ordinal)
     if (!row) throw new AppError('BLOCK_NOT_FOUND')
     return { blockId: row.block_id, ordinal: row.ordinal }
   }
 
+  // 按笔记标题 + 块 ID 解析块引用；失效块也返回（带 valid 标记）供前端提示引用失效
   resolve(noteTitle: string, blockId: string): BlockRefDTO | null {
     const note = this.ctx.services.note.requireTitleRow(noteTitle)
     if (!note) return null

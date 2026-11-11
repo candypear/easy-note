@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 通用标签条：受控组件，选中项由 modelValue 决定，点击仅发 update:modelValue，
+// 自身不持状态，便于父级把选中态接入全局 store。
 const props = defineProps<{
   modelValue: string
   tabs: { id: string; label: string; icon?: string }[]

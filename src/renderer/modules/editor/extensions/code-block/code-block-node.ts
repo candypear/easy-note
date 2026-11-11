@@ -1,3 +1,5 @@
+// 代码块自定义节点：代码文本存于 code 属性而非子节点（atom），
+// 用 Vue NodeView 桥接 CodeMirror 编辑；支持 ``` 输入规则快捷创建。
 import { InputRule, Node, mergeAttributes } from '@tiptap/core'
 import { VueNodeViewRenderer, type NodeViewProps } from '@tiptap/vue-3'
 import type { Component } from 'vue'
@@ -26,11 +28,12 @@ export const CodeBlock = Node.create({
     return ['pre', mergeAttributes(HTMLAttributes, { 'data-code-block': '' })]
   },
   addNodeView() {
-    // SFC props are declared at runtime; the renderer contract is NodeViewProps.
+    // SFC 的 props 在运行时声明，这里断言为 NodeViewProps 以满足渲染器契约
     return VueNodeViewRenderer(CodeBlockView as Component<NodeViewProps>)
   },
   addInputRules() {
     return [
+      // 行首输入 ```语言 即替换为代码块节点，语言可省略
       new InputRule({
         find: /^```([\w+#.-]*)$/,
         handler: ({ state, range, match }) => {

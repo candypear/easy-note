@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 斜杠菜单右侧的块类型预览：先逐字"打字"展示 Markdown 源码，
+// 停顿后淡入对应的静态渲染效果，帮助用户理解插入结果。
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { renderKatex } from '../extensions/math/katex'
 
@@ -21,6 +23,7 @@ interface PreviewDefinition {
   kind: PreviewKind
 }
 
+// 各菜单项的示例 Markdown 与对应渲染类型（渲染结果为模板中的静态片段，不走真实解析器）
 const PREVIEWS: Record<string, PreviewDefinition> = {
   paragraph: { kind: 'paragraph', markdown: '这是一段正文。' },
   h1: { kind: 'h1', markdown: '# 标题一' },
@@ -65,6 +68,8 @@ function stopTimers(): void {
   }
 }
 
+// 打字动画：按码点逐字追加（Array.from 保证中文/emoji 不被截半），
+// 打完后延时切换到 rendered 阶段；重启前先清掉旧定时器防止叠加。
 function start(): void {
   stopTimers()
   typed.value = ''

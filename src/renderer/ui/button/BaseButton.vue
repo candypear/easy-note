@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 通用按钮：无内部状态的纯展示组件，variant/size 仅映射样式类；
+// 未声明 emits，@click 等原生事件自动透传到 button 元素。
 import { computed } from 'vue'
 
 const props = withDefaults(

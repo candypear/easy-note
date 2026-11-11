@@ -1,3 +1,5 @@
+// 数学公式节点：块级（$$）与行内（$...$）两种原子节点，LaTeX 存于 latex 属性，
+// 由 KaTeX NodeView 渲染；支持 $$ 与 $...$ 输入规则快捷创建。
 import { InputRule, Node, mergeAttributes, nodeInputRule } from '@tiptap/core'
 import { VueNodeViewRenderer, type NodeViewProps } from '@tiptap/vue-3'
 import type { Component } from 'vue'
@@ -22,7 +24,7 @@ export const MathBlock = Node.create({
     return ['div', mergeAttributes(HTMLAttributes, { 'data-math-block': '' })]
   },
   addNodeView() {
-    // SFC props are declared at runtime; the renderer contract is NodeViewProps.
+    // SFC 的 props 在运行时声明，这里断言为 NodeViewProps 以满足渲染器契约
     return VueNodeViewRenderer(MathBlockView as Component<NodeViewProps>)
   },
   addInputRules() {
@@ -55,7 +57,7 @@ export const MathInline = Node.create({
     return ['span', mergeAttributes(HTMLAttributes, { 'data-math-inline': '' })]
   },
   addNodeView() {
-    // SFC props are declared at runtime; the renderer contract is NodeViewProps.
+    // SFC 的 props 在运行时声明，这里断言为 NodeViewProps 以满足渲染器契约
     return VueNodeViewRenderer(MathInlineView as Component<NodeViewProps>)
   },
   addInputRules() {

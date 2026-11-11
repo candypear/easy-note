@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// 轻量悬浮提示：包裹任意内容，悬停/聚焦延迟显示，移出即隐藏并清理定时器
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 const props = withDefaults(

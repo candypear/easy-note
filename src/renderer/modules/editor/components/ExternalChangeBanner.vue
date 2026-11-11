@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// 外部变更提示条：磁盘文件被其他程序修改时显示，让用户选择加载磁盘内容或保留当前编辑。
 import { useContext } from '../../../app/providers'
 
 const props = defineProps<{

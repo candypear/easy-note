@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 查找替换栏：在 ProseMirror 文档中做大小写不敏感的文本查找，
+// 通过选区定位匹配项并支持逐个/全部替换。
 import { computed, ref, watch, type PropType } from 'vue'
 import type { Editor } from '@tiptap/core'
 import { useContext } from '../../../app/providers'
@@ -25,6 +27,8 @@ interface Match {
 
 const hasQuery = computed(() => query.value.length > 0)
 
+// 遍历所有文本节点收集匹配区间；pos 是节点起点，加上节点内偏移得到文档坐标。
+// 匹配不跨节点，因此跨越格式边界（如一半加粗）的关键词不会被找到。
 function findMatches(): Match[] {
   const editor = props.editor
   if (!editor || !query.value) return []
@@ -42,6 +46,9 @@ function findMatches(): Match[] {
   return matches
 }
 
+// 以当前光标位置为基准找下一个/上一个匹配：向前取第一个 from >= 光标，
+// 向后取最后一个 to <= 光标（即整个匹配在光标之前）；越界时循环到另一端。
+// 命中后把匹配设为选区并滚动到可见，供“替换当前”直接使用该选区。
 function selectMatch(forward: boolean): void {
   const editor = props.editor
   if (!editor) return
@@ -57,6 +64,7 @@ function selectMatch(forward: boolean): void {
   active.value = matches.indexOf(target)
 }
 
+// 查询词或打开状态变化时自动定位第一个匹配
 watch(
   () => [query.value, props.open] as const,
   () => {
@@ -64,6 +72,8 @@ watch(
   }
 )
 
+// 替换当前选区：先校验选区文本确实等于查询词（用户可能手动改过选区），
+// 避免误替换；替换后自动跳到下一个匹配。
 function replaceCurrent(): void {
   const editor = props.editor
   if (!editor || !query.value) return
@@ -74,6 +84,8 @@ function replaceCurrent(): void {
   selectMatch(true)
 }
 
+// 全部替换：倒序应用各匹配区间，前面的替换不会使后面匹配的位置失效；
+// 整个链式调用在一个事务内完成，可一次撤销。
 function replaceAll(): void {
   const editor = props.editor
   if (!editor || !query.value) return
@@ -87,6 +99,7 @@ function replaceAll(): void {
   count.value = 0
 }
 
+// 关闭后把焦点还给编辑器，方便继续编辑
 function close(): void {
   emit('close')
   props.editor?.commands.focus()

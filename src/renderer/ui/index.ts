@@ -1,3 +1,5 @@
+// Base* 通用组件与 toast 的统一出口（barrel），提供聚合导入入口；
+// 组件本身零业务依赖，可在任意模块复用。
 export { default as BaseButton } from './button/BaseButton.vue'
 export { default as BaseInput } from './input/BaseInput.vue'
 export { default as BaseMenu } from './menu/BaseMenu.vue'

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// Markdown 源码模式：用 CodeMirror 适配层编辑整篇笔记原文，
+// 通过 v-model 与外部（NoteEditor）双向同步文本。
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { createCodeEditor, type CodeEditorHandle } from '../extensions/code-block/codemirror-adapter'
 
@@ -22,6 +24,7 @@ onMounted(() => {
   })
 })
 
+// 外部值变化时回写 CodeMirror；适配层的 setValue 会跳过与当前内容相同的值，避免回环触发 onChange
 watch(
   () => props.modelValue,
   (value) => editor?.setValue(value)

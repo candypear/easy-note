@@ -1,3 +1,5 @@
+// 编辑器构建工具：组装 TipTap 扩展集合（含自定义节点）、创建编辑器实例，
+// 并提供块移动快捷键、表格对齐、文档统计与大纲收集等辅助能力。
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import Table from '@tiptap/extension-table'
@@ -27,9 +29,12 @@ export interface EditorOptions {
   onSelectionChange(): void
 }
 
+// Alt+上/下移动光标所在块：先删除原节点，再用事务映射修正目标插入位置
+// （删除会使后续位置整体前移，直接复用旧位置会插错），最后恢复光标到块内。
 function moveBlock(editor: CoreEditor, direction: -1 | 1): boolean {
   const { state } = editor
   const { $from } = state.selection
+  // depth === 0 表示光标直接在 doc 层，没有可移动的块
   if ($from.depth === 0) return false
   const depth = $from.depth
   const parent = $from.node(depth - 1)
@@ -39,11 +44,14 @@ function moveBlock(editor: CoreEditor, direction: -1 | 1): boolean {
 
   const node = parent.child(index)
   const from = $from.before(depth)
+  // 从父节点起点累加兄弟节点的 nodeSize，得到目标插入位置；
+  // 向下移动时需越过被移动节点自身的长度（插到下一块之后）
   let insertPos = $from.start(depth - 1)
   for (let i = 0; i < targetIndex; i += 1) insertPos += parent.child(i).nodeSize
   if (direction > 0) insertPos += node.nodeSize
 
   const tr = state.tr.delete(from, from + node.nodeSize)
+  // 删除后原 insertPos 已失效，用 tr.mapping 映射到新文档坐标再插入
   const mapped = tr.mapping.map(insertPos)
   tr.insert(mapped, node)
   tr.setSelection(TextSelection.near(tr.doc.resolve(mapped + 1)))
@@ -51,6 +59,8 @@ function moveBlock(editor: CoreEditor, direction: -1 | 1): boolean {
   return true
 }
 
+// 编辑器级快捷键：Tab/Shift-Tab 调整列表层级（仅列表内生效，否则交回默认处理），
+// Alt+方向键移动当前块。
 const EditorKeymap = Extension.create({
   name: 'easynoteKeymap',
   addKeyboardShortcuts() {
@@ -77,6 +87,8 @@ const EditorKeymap = Extension.create({
   }
 })
 
+// 表格单元格对齐属性：解析/渲染都走 data-align，同时输出行内 style 保证显示；
+// 非法值返回 null，避免任意样式注入。
 const alignAttribute: Attribute = {
   default: null,
   parseHTML: (element) => element.getAttribute('data-align'),
@@ -87,6 +99,7 @@ const alignAttribute: Attribute = {
   }
 }
 
+// 扩展原生表格单元格/表头，附加对齐属性（Markdown 表格的 :---: 语法需要）
 const AlignedTableCell = TableCell.extend({
   addAttributes() {
     return {
@@ -105,6 +118,7 @@ const AlignedTableHeader = TableHeader.extend({
   }
 })
 
+// 组装全部扩展；StarterKit 自带的 codeBlock 被禁用，改用自定义 CodeBlock（CodeMirror NodeView）
 export function buildExtensions(placeholder: string): Extensions {
   return [
     StarterKit.configure({
@@ -157,6 +171,7 @@ export function documentStats(doc: JSONContent): {
   return countWords(extractPlainText(doc))
 }
 
+// 收集所有标题用于大纲面板；pos 为节点在文档中的位置，供点击大纲跳转
 export function collectHeadings(doc: ProseMirrorNode): Heading[] {
   const headings: Heading[] = []
   doc.descendants((node, pos) => {

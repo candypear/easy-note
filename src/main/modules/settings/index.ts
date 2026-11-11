@@ -1,3 +1,5 @@
+// 设置模块：读写应用设置 JSON（主题、字号、布局、最近笔记、vault 路径等），
+// 持久化前做校验归一化，变更时广播事件，并桥接系统主题变化。
 import type { MainContext } from '@main/bootstrap/types'
 import type { MainModule } from '@main/bootstrap/types'
 import type { SettingsDTO, SettingsPatch } from '@shared/contracts/settings'
@@ -23,11 +25,13 @@ export class SettingsService {
 
   constructor(private readonly ctx: MainContext) {}
 
+  // 只加载一次，并发调用共享同一个 Promise
   load(): Promise<void> {
     this.loadPromise ??= this.readSettings()
     return this.loadPromise
   }
 
+  // 读取时与默认值合并；文件缺失或损坏则整体回退默认设置，保证应用可启动
   private async readSettings(): Promise<void> {
     try {
       const raw = await this.ctx.fs.readFile(this.ctx.paths.settingsFile)
@@ -43,6 +47,7 @@ export class SettingsService {
     return { ...this.state, recentNoteIds: [...this.state.recentNoteIds] }
   }
 
+  // 合并补丁 -> 归一化 -> 持久化；主题变更需同步到原生层，最后广播变更的键与全量设置
   async patch(patch: SettingsPatch): Promise<SettingsDTO> {
     await this.load()
     const keys = Object.keys(patch) as (keyof SettingsDTO)[]
@@ -71,6 +76,7 @@ export class SettingsService {
     await this.patch({ vaultPath: path })
   }
 
+  // 白名单/夹逼校验：防止磁盘上的脏数据或非法补丁破坏界面
   private normalize(): void {
     if (!['light', 'dark', 'system'].includes(this.state.theme)) this.state.theme = 'system'
     if (![14, 16, 18].includes(this.state.fontSize)) this.state.fontSize = 16
@@ -119,6 +125,7 @@ export function createSettingsModule(ctx: MainContext): SettingsModule {
       ipc.handle(SettingsChannels.rebuildIndex, () => ctx.services.indexer.rebuild())
     },
     async start() {
+      // 启动时应用已保存主题，并把系统主题变化转发为事件供渲染进程跟随
       await service.load()
       ctx.theme.setMode(service.get().theme)
       unsubscribe = ctx.theme.onChange((theme) => ctx.events.publish('theme:changed', { theme }))

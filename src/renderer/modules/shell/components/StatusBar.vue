@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 状态栏：左侧展示字数/字符/阅读时长，右侧展示索引进度与保存状态；
+// 保存失败时提供"重试"，通过 workspace 计数器信号触发编辑器重新保存。
 import { useContext } from '../../../app/providers'
 import BaseButton from '../../../ui/button/BaseButton.vue'
 

@@ -1,9 +1,12 @@
+// CodeMirror 适配层：统一创建带主题/高亮/快捷键的代码编辑器实例，
+// 供代码块 NodeView 与 Markdown 源码模式复用，通过句柄同步内容与语言。
 import { HighlightStyle, bracketMatching, indentOnInput, syntaxHighlighting } from '@codemirror/language'
 import { EditorState, type Extension } from '@codemirror/state'
 import { EditorView, drawSelection, dropCursor, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, rectangularSelection } from '@codemirror/view'
 import { tags } from '@lezer/highlight'
 import { codeExtensions, codeKeymap, languageExtension } from './languages'
 
+// 语法高亮全部映射到 CSS 变量，随应用主题（明/暗）自动切换
 const highlight = HighlightStyle.define([
   { tag: tags.keyword, color: 'var(--code-keyword)' },
   { tag: tags.string, color: 'var(--code-string)' },
@@ -61,6 +64,7 @@ export function createCodeEditor(parent: HTMLElement, options: CodeEditorOptions
       dropCursor(),
       rectangularSelection(),
       EditorView.contentAttributes.of({ spellcheck: 'false' }),
+      // 仅文档变化时向外回调，光标/选区移动不触发，避免无谓的保存
       EditorView.updateListener.of((update) => {
         if (update.docChanged) options.onChange(update.state.doc.toString())
       })
@@ -95,12 +99,14 @@ export function createCodeEditor(parent: HTMLElement, options: CodeEditorOptions
   return {
     view,
     setValue(value) {
+      // 与当前内容相同则跳过：外部回写（如 NodeView update）不会再次触发 onChange，避免同步回环
       if (value === view.state.doc.toString()) return
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: value } })
     },
     setLanguage(next) {
       if (next === language) return
       language = next
+      // CodeMirror 语言扩展不能原地替换，需保留文档内容重建整个 EditorState
       const content = view.state.doc.toString()
       view.setState(EditorState.create({ doc: content, extensions: build() }))
     },

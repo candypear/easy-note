@@ -1,3 +1,4 @@
+// 主进程服务类型汇总：定义 ctx.services 的形状，仅聚合各模块 service 类型，不含运行时逻辑。
 import type { BlockService } from '@main/modules/block'
 import type { FolderService } from '@main/modules/folder'
 import type { GraphService } from '@main/modules/graph'

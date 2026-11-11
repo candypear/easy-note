@@ -1,3 +1,5 @@
+// 渲染模块注册清单：main.ts 按数组顺序依次 install。
+// shell 必须排首位（提供外壳状态与注册表），其余模块向其注册视图/快捷键。
 import type { RendererModule } from './context'
 import { shellModule } from '../modules/shell'
 import { explorerModule } from '../modules/explorer'

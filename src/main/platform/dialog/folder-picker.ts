@@ -1,3 +1,4 @@
+// 系统文件夹选择对话框封装：向上层提供统一的选目录端口，屏蔽 Electron dialog 细节。
 import { dialog } from 'electron'
 
 export interface DialogPort {

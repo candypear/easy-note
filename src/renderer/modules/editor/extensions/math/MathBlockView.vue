@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 公式块 NodeView：KaTeX 实时渲染 latex 属性；点击展开 textarea 编辑源码，
+// 输入即写回节点属性，失焦收起，错误时显示提示。
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { computed, nextTick, onMounted, ref, type PropType } from 'vue'
 import { renderKatex } from './katex'
@@ -23,6 +25,7 @@ const input = ref<HTMLTextAreaElement | null>(null)
 const latex = computed(() => String(props.node.attrs.latex ?? ''))
 const result = computed(() => renderKatex(latex.value, true))
 
+// 等 v-if 的 textarea 挂载后再聚焦
 async function startEdit(): Promise<void> {
   editing.value = true
   await nextTick()

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 文件树容器：持有树状态与动作，集中管理右键菜单、行内重命名、删除确认、
+// 拖拽落点高亮；子节点交互经 TreeNode 事件冒泡到这里统一处理。
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useContext } from '../../../app/providers'
 import BaseButton from '../../../ui/button/BaseButton.vue'
@@ -40,8 +42,10 @@ const menu = ref<MenuState>({
   name: ''
 })
 
+// 行内重命名状态提升到容器：同一时刻只允许一个节点处于编辑态
 const editingPath = ref<string | null>(null)
 const editingValue = ref('')
+// 当前拖拽悬停的目标文件夹路径，用于高亮落点
 const dragTarget = ref<string | null>(null)
 const confirm = ref<{
   open: boolean
@@ -80,11 +84,13 @@ function findFolder(path: string | null): FolderNode | null {
 }
 
 function parentForNew(): string | null {
+  // 新建位置跟随选中项：选中文件夹→其内；选中笔记→同级目录；否则库根
   if (state.selectedKind === 'folder') return state.selectedPath
   if (state.selectedKind === 'note') return findNote(state.selectedNoteId)?.folderPath ?? null
   return null
 }
 
+// 四种菜单共用一个 BaseMenu 实例，按 kind 切换菜单项，避免多实例叠加
 const menuItems = computed<MenuItem[]>(() => {
   if (menu.value.kind === 'new') {
     return [
@@ -123,6 +129,7 @@ function openMenu(event: MouseEvent, kind: MenuState['kind'], path: string, note
 }
 
 function openToolbarMenu(event: MouseEvent, kind: 'new' | 'more'): void {
+  // 工具栏菜单锚定按钮："新建"左对齐，"更多"右对齐（菜单宽约 180px）
   const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
   menu.value = {
     open: true,
@@ -136,6 +143,7 @@ function openToolbarMenu(event: MouseEvent, kind: 'new' | 'more'): void {
 }
 
 function startRename(kind: 'folder' | 'note', path: string, noteId: string | null, name: string): void {
+  // 进入编辑态前先选中该节点，保证视觉上编辑行与选中行一致
   editingPath.value = path
   editingValue.value = name
   if (kind === 'folder') {
@@ -151,6 +159,7 @@ function startRename(kind: 'folder' | 'note', path: string, noteId: string | nul
 
 async function finishRename(kind: 'folder' | 'note', path: string, noteId: string | null): Promise<void> {
   const value = editingValue.value
+  // 先退出编辑态再异步提交：Enter 与 blur 可能先后触发，避免重复提交
   editingPath.value = null
   if (!value.trim()) return
   const ok = await actions.rename(kind, path, noteId, value)
@@ -158,6 +167,7 @@ async function finishRename(kind: 'folder' | 'note', path: string, noteId: strin
 }
 
 function requestDelete(kind: 'folder' | 'note', path: string, noteId: string | null, name: string): void {
+  // 删除一律先弹确认框；文件夹附带递归笔记数，让用户明确影响范围
   const folder = kind === 'folder' ? findFolder(path) : null
   confirm.value = {
     open: true,
@@ -171,6 +181,7 @@ function requestDelete(kind: 'folder' | 'note', path: string, noteId: string | n
 
 async function confirmDelete(): Promise<void> {
   const current = confirm.value
+  // 删除走系统回收站（主进程实现）；失败多因系统不支持回收站，按此提示
   const ok = await actions.remove(current.kind, current.path, current.noteId)
   confirm.value = { ...current, open: false }
   if (!ok) toast(t('menu.trashUnavailable'), 'error')
@@ -178,6 +189,7 @@ async function confirmDelete(): Promise<void> {
 
 async function onMenuSelect(id: string): Promise<void> {
   const current = menu.value
+  // 先关菜单再执行动作，动作可能弹对话框/进入编辑态，避免菜单残留
   menu.value = { ...current, open: false }
   if (id === 'new-note') {
     await actions.createNote(current.kind === 'folder' ? current.path : parentForNew())
@@ -200,6 +212,8 @@ async function onMenuSelect(id: string): Promise<void> {
 }
 
 async function onDropItem(payload: DragPayload, target: string | null): Promise<void> {
+  // target 为 null 表示移到库根；文件夹落到自身直接忽略，
+  // 更深的循环校验（移入后代）由主进程兜底
   dragTarget.value = null
   if (payload.kind === 'folder') {
     if (payload.path === target) return
@@ -210,6 +224,8 @@ async function onDropItem(payload: DragPayload, target: string | null): Promise<
 }
 
 function onRootDrop(event: DragEvent): void {
+  // 树空白处兜底落点：未命中任何文件夹时移动到库根；
+  // 只接受自定义 MIME 类型，忽略外部文件拖入
   event.preventDefault()
   dragTarget.value = null
   const raw = event.dataTransfer?.getData('application/x-easynote')
@@ -218,17 +234,20 @@ function onRootDrop(event: DragEvent): void {
     const payload = JSON.parse(raw) as DragPayload
     void onDropItem(payload, null)
   } catch {
-    // ignore malformed payload
+    // 拖拽数据非法时忽略，不影响树状态
   }
 }
 
 let reloadTimer: number | undefined
 function scheduleReload(): void {
+  // 120ms 防抖：批量文件变更/索引更新会连发多个事件，合并为一次整树重载
   clearTimeout(reloadTimer)
   reloadTimer = window.setTimeout(() => void actions.reload(), 120)
 }
 
 onMounted(() => {
+  // 先还原展开状态再拉树，避免渲染时全部折叠再跳开；
+  // 库切换立即重载，其余文件/索引事件走防抖通道
   actions.restoreExpanded()
   if (ctx.shell.state.vaultOpen) void actions.reload()
   stops.push(ctx.events.on('vault:changed', () => void actions.reload()))

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 图标门面：用语义名（如 sidebar/folder）映射到 Lucide 组件，
+// 业务侧不直接依赖图标库，换库或改图标只需改这里的映射表。
 import { computed } from 'vue'
 import {
   AlignCenter,
@@ -57,6 +59,7 @@ const props = withDefaults(
   { size: 16, strokeWidth: 1.5 }
 )
 
+// 语义名 → Lucide 组件映射；允许多个别名指向同一图标（如 x/close）
 const ICONS: Record<string, LucideIcon> = {
   sidebar: PanelLeft,
   panelRight: PanelRight,

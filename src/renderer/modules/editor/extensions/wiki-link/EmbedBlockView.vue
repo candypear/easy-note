@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 块级嵌入 NodeView（![[笔记#^块]]）：挂载时经主进程解析目标块并展示其纯文本快照，
+// 解析失败显示"引用已失效"，点击跳转到源笔记对应块。
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { computed, onMounted, ref, type PropType } from 'vue'
 import type { BlockRefDTO } from '@shared/contracts/block'
@@ -26,6 +28,7 @@ const failed = ref(false)
 const note = computed(() => String(props.node.attrs.note ?? ''))
 const blockId = computed(() => String(props.node.attrs.blockId ?? ''))
 
+// ok 但 data 为空表示块已被删除/改名，同样标记失效
 async function load(): Promise<void> {
   const result = await ctx.api.block.resolve(note.value, blockId.value)
   if (result.ok) {

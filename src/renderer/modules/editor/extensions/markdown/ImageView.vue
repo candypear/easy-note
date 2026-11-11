@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// 图片 NodeView：暂不支持渲染图片附件，显示 alt/src 占位；节点属性保留完整信息供序列化。
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { computed, type PropType } from 'vue'
 import Icon from '../../../../ui/icons/Icon.vue'

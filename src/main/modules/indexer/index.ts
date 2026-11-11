@@ -1,3 +1,5 @@
+// 索引器模块：监听 vault 文件变化并维护 SQLite 派生索引（块/链接/标签/全文），
+// 提供全量扫描、单文件增量索引与重建；file_state 表记录文件指纹用于跳过未变更文件。
 import { join } from 'node:path'
 import type { MainContext, MainModule } from '@main/bootstrap/types'
 import type { RebuildIndexResult } from '@shared/contracts/settings'
@@ -99,6 +101,7 @@ export class IndexerService {
     await this.ctx.watcher.stop()
   }
 
+  // vault 打开/切换时：停掉旧 watcher 与防抖定时器，再启动新监听并触发一次非强制扫描
   private async onVaultChanged(path: string | null): Promise<void> {
     await this.ctx.watcher.stop()
     for (const timer of this.timers.values()) clearTimeout(timer)
@@ -114,6 +117,7 @@ export class IndexerService {
     void this.scan(false)
   }
 
+  // 按路径防抖 220ms：合并编辑器/系统产生的重复事件，避免索引到写了一半的文件
   private enqueue(type: 'add' | 'change' | 'unlink', absolutePath: string): void {
     const current = this.timers.get(absolutePath)
     clearTimeout(current)
@@ -132,6 +136,7 @@ export class IndexerService {
     )
   }
 
+  // 文件被删除：清理 file_state 与笔记的全部索引记录，重解析链接（指向它的链接变失效）并广播删除
   private async handleUnlink(absolutePath: string): Promise<void> {
     const root = this.ctx.services.vault.root
     if (!root) return
@@ -144,11 +149,13 @@ export class IndexerService {
     this.ctx.events.publish('note:deleted', { noteId: note.id })
   }
 
+  // 标记应用内部写入，使 watcher 触发的 change 不被误判为“外部修改”；返回解除标记的函数
   beginInternalWrite(absolutePath: string): () => void {
     this.internalWrites.add(absolutePath)
     return () => this.internalWrites.delete(absolutePath)
   }
 
+  // 并发调用共享同一个扫描 Promise，防止重入导致重复索引
   async scan(force: boolean): Promise<number> {
     if (this.scanning) return this.scanPromise ?? Promise.resolve(0)
     const root = this.ctx.services.vault.root
@@ -161,6 +168,8 @@ export class IndexerService {
     return this.scanPromise
   }
 
+  // 全量扫描：先同步目录树，再递归收集 .md 文件（跳过隐藏项与 .easynote），
+  // 逐个增量索引并广播进度；单文件失败只记日志不中断
   private async runScan(root: string, force: boolean): Promise<number> {
     await this.ctx.services.folder.syncFromDisk()
     const files: string[] = []
@@ -194,6 +203,7 @@ export class IndexerService {
         total: files.length
       })
     }
+    // 扫描结束后统一重解析链接：处理前向引用（目标笔记在源笔记之后才被索引）
     this.ctx.services.link.resolveAll()
     const now = new Date().toISOString()
     await this.ctx.services.settings.setLastIndexedAt(now)
@@ -201,6 +211,8 @@ export class IndexerService {
     return indexed
   }
 
+  // 索引单个磁盘文件：路径锁防并发；指纹（hash+size）未变则跳过；
+  // 外部修改（非应用写入且内容变化）会广播事件供前端提示冲突
   async indexFile(
     absolutePath: string,
     options: { force?: boolean; external?: boolean } = {}
@@ -235,6 +247,7 @@ export class IndexerService {
         })
       }
 
+      // 依次重建派生索引：块 -> 链接 -> 标签 -> 全文，最后回写笔记元数据与 file_state 指纹
       const parsed = parseMarkdownBlocks(content)
       this.ctx.services.block.sync(asNoteId(row.id), parsed.blocks)
       const blocks = this.ctx.services.block.listByNote(asNoteId(row.id))
@@ -258,6 +271,8 @@ export class IndexerService {
     })
   }
 
+  // 应用内保存后的同步索引入口：内容已在手，无需重读磁盘或做指纹比对；
+  // 完成后立即重解析链接并广播，保证保存后反向链接等即时可见
   async indexNote(noteId: NoteId, content: string): Promise<void> {
     const root = this.ctx.services.vault.root
     if (!root) return
@@ -287,6 +302,7 @@ export class IndexerService {
     this.ctx.events.publish('index:updated', { noteIds: [noteId] })
   }
 
+  // 重建索引：清空 file_state 指纹后强制全量扫描，使所有文件重新索引
   async rebuild(): Promise<RebuildIndexResult> {
     this.repo().clear()
     const indexed = await this.scan(true)

@@ -1,3 +1,4 @@
+// 快速切换模块入口：注册笔记切换浮层与 Ctrl+K 快捷键（未打开 vault 时不响应）。
 import type { RendererModule } from '../../app/context'
 import QuickSwitch from './components/QuickSwitch.vue'
 

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 代码块 NodeView：内嵌 CodeMirror 编辑代码，编辑结果写回节点 code 属性；
+// 提供语言切换、复制与折叠（折叠时仅显示首行预览）。
 import { NodeViewWrapper } from '@tiptap/vue-3'
 import { computed, onBeforeUnmount, onMounted, ref, watch, type PropType } from 'vue'
 import Icon from '../../../../ui/icons/Icon.vue'
@@ -33,6 +35,7 @@ const languageOptions = LANGUAGES
 
 onMounted(() => {
   if (!host.value) return
+  // CodeMirror 输入 → updateAttributes 更新 ProseMirror 节点属性，进入正常事务/撤销体系
   editor.value = createCodeEditor(host.value, {
     value: code.value,
     language: language.value,
@@ -42,10 +45,12 @@ onMounted(() => {
   })
 })
 
+// 节点属性被外部（撤销/重做、setContent 等）修改时回写 CodeMirror；setValue 同值跳过防回环
 watch(code, (value) => {
   editor.value?.setValue(value)
 })
 
+// 从折叠恢复且实例尚未创建时补建编辑器（覆盖属性驱动展开、未经过 toggleFold 的路径）
 watch(collapsed, (value) => {
   if (value || !host.value || editor.value) return
   editor.value = createCodeEditor(host.value, {
@@ -75,6 +80,7 @@ async function copy(): Promise<void> {
 function toggleFold(): void {
   props.updateAttributes({ collapsed: !collapsed.value })
   if (!collapsed.value && !editor.value) {
+    // 等一帧让 v-show 的宿主可见后再建 CodeMirror，避免隐藏状态下测量尺寸异常
     requestAnimationFrame(() => {
       if (!host.value) return
       editor.value = createCodeEditor(host.value, {

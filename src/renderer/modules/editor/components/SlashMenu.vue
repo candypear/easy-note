@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 斜杠命令菜单：展示可插入的块类型，支持按查询词过滤、键盘上下选择，
+// 选中后先删除已输入的 "/查询词" 再执行对应插入命令；右侧联动预览面板。
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type PropType } from 'vue'
 import type { Editor } from '@tiptap/core'
 import Icon from '../../../ui/icons/Icon.vue'
@@ -23,6 +25,7 @@ interface Item {
   run(editor: Editor): void
 }
 
+// 菜单项清单：label 为中文名，id 兼作英文搜索关键字，run 是选中后执行的 TipTap 命令
 const items: Item[] = [
   { id: 'paragraph', label: '段落', icon: 'paragraph', category: '基础', run: (e) => e.chain().focus().setParagraph().run() },
   { id: 'h1', label: '标题 1', icon: 'heading', category: '标题', run: (e) => e.chain().focus().toggleHeading({ level: 1 }).run() },
@@ -62,12 +65,14 @@ const MENU_WIDTH = 280
 const PREVIEW_WIDTH = 248
 const PREVIEW_HEIGHT = 170
 
+// 过滤规则：中文 label 或英文 id 包含查询词即匹配（不区分大小写）
 const filtered = computed(() => {
   const query = props.query.trim().toLowerCase()
   if (!query) return items
   return items.filter((item) => item.label.toLowerCase().includes(query) || item.id.includes(query))
 })
 
+// 菜单定位：按内容估算高度并把坐标夹在视口内，避免超出屏幕
 const menuHeight = computed(() =>
   Math.min(filtered.value.length * 32 + 10, 400, window.innerHeight - 16)
 )
@@ -78,6 +83,7 @@ const activeItem = computed(() => filtered.value[active.value])
 const menuRef = ref<HTMLElement | null>(null)
 const previewTop = ref(0)
 
+// 预览面板优先放菜单右侧，放不下则翻到左侧，仍放不下就贴近视口右缘
 const previewLeft = computed(() => {
   const right = left.value + MENU_WIDTH + 8
   if (right + PREVIEW_WIDTH <= window.innerWidth - 8) return right
@@ -86,6 +92,8 @@ const previewLeft = computed(() => {
   return Math.max(8, window.innerWidth - PREVIEW_WIDTH - 8)
 })
 
+// 让预览面板垂直对齐当前高亮项：先按行高估算，DOM 更新后再用真实
+// getBoundingClientRect 修正（菜单可能已滚动，估算位置会偏差）。
 async function syncPreviewTop(): Promise<void> {
   previewTop.value = Math.max(
     8,
@@ -102,10 +110,12 @@ async function syncPreviewTop(): Promise<void> {
 
 watch([() => props.open, active, top, filtered], () => void syncPreviewTop(), { immediate: true })
 
+// 过滤结果变短时把高亮索引重置，避免指向不存在的项
 watch(filtered, () => {
   if (active.value >= filtered.value.length) active.value = 0
 })
 
+// 执行命令前先删掉从斜杠触发位置 start 到当前光标之间的 "/查询词" 文本
 function select(item: Item): void {
   if (!props.editor) return
   const to = props.editor.state.selection.from
@@ -116,6 +126,8 @@ function select(item: Item): void {
   emit('close')
 }
 
+// 键盘导航：上下键循环移动高亮，Enter 确认，Esc 关闭；
+// 以捕获阶段监听 document，抢在 ProseMirror 处理这些按键之前拦截。
 function onKeydown(event: KeyboardEvent): void {
   if (!props.open) return
   if (event.key === 'Escape') {

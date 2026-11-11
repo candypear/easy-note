@@ -1,4 +1,6 @@
 <script setup lang="ts">
+// 自绘窗口控制按钮（最小化/最大化-还原/关闭），仅在非 macOS 平台渲染；
+// 状态与动作全部来自 useWindowControls，经 IPC 委托主进程窗口模块。
 import { useContext } from '../../../app/providers'
 import Icon from '../../../ui/icons/Icon.vue'
 import { useWindowControls } from '../composables/useWindowControls'

@@ -1,3 +1,4 @@
+// 设置模块契约：设置 DTO、可写字段子集与 IPC 通道/API。
 import type { NoteId } from '../types/brand'
 import type { IpcResult } from './envelope'
 
@@ -12,10 +13,13 @@ export interface SettingsDTO {
   rightWidth: number
   sidebarOpen: boolean
   rightOpen: boolean
+  // 最近打开的笔记，按时间倒序，由主进程维护
   recentNoteIds: NoteId[]
+  // 上次全量索引完成时间（ISO）；null 表示尚未索引
   lastIndexedAt: string | null
 }
 
+// 只允许渲染端修改这些字段；recentNoteIds/lastIndexedAt 由主进程内部维护，不开放写入
 export type SettingsPatch = Partial<
   Pick<
     SettingsDTO,

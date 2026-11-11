@@ -1,3 +1,5 @@
+// 渲染进程核心契约：定义全局上下文 RendererContext 及 shell/workspace/快捷键等服务接口，
+// 各模块只依赖这里的类型而非具体实现，实现由 app/ 与 shell 模块提供。
 import type { Component } from 'vue'
 import type { EasyNoteApi } from '@shared/contracts/api'
 import type { ThemeMode } from '@shared/contracts/settings'
@@ -33,6 +35,8 @@ export interface StatusItem {
   component: Component
 }
 
+// 外壳插槽注册表：模块把视图/标签/状态项/浮层组件注册进来，
+// shell 组件按 order 排序渲染，实现外壳与业务模块解耦
 export interface ShellRegistry {
   sidebar: {
     registerView(view: SidebarView): void
@@ -97,6 +101,7 @@ export interface Heading {
   pos: number
 }
 
+// 编辑器内的定位目标：nonce 单调递增，保证重复打开同一笔记/同一块也能触发定位
 export interface RevealTarget {
   noteId: string
   nonce: number
@@ -106,6 +111,8 @@ export interface RevealTarget {
   highlight?: boolean
 }
 
+// 工作区服务：当前笔记、保存状态、文档统计的单一数据源；
+// saveRequest/findRequest 等计数器是"命令信号"，编辑器 watch 其变化来执行动作
 export interface WorkspaceService {
   currentNoteId: string | null
   currentNoteTitle: string
@@ -140,6 +147,7 @@ export interface WorkspaceService {
   setSaveState(state: WorkspaceService['saveState']): void
 }
 
+// 全局快捷键注册表：register 返回反注册函数，供模块卸载时清理
 export interface ShortcutRegistry {
   register(combo: string, handler: (event: KeyboardEvent) => void): () => void
   dispose(): void
@@ -154,6 +162,7 @@ export interface RendererContext {
   workspace: WorkspaceService
 }
 
+// 渲染模块协议：install 在启动时按序调用，dispose 用于释放监听器等副作用
 export interface RendererModule {
   id: string
   install(app: unknown, ctx: RendererContext): void

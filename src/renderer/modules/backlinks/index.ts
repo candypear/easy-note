@@ -1,3 +1,4 @@
+// 反链模块入口：把 BacklinksPanel 注册为右侧面板的一个标签页。
 import type { RendererModule } from '../../app/context'
 import BacklinksPanel from './components/BacklinksPanel.vue'
 

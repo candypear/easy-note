@@ -1,3 +1,5 @@
+// 窗口模块：封装主窗口的最小化/最大化/关闭控制与平台信息查询，
+// 并广播最大化状态变化（自绘标题栏按钮需要跟随）。
 import type { BrowserWindow } from 'electron'
 import type { MainContext, MainModule } from '@main/bootstrap/types'
 import { WindowChannels } from '@shared/contracts/window'
@@ -8,6 +10,7 @@ export class WindowService {
 
   constructor(private readonly ctx: MainContext) {}
 
+  // 绑定主窗口并监听 maximize/unmaximize，把状态广播给渲染进程更新标题栏按钮
   attach(window: BrowserWindow): void {
     this.window = window
     const publish = (): void => {

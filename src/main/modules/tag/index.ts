@@ -1,3 +1,5 @@
+// 标签模块：从 Markdown 提取 #标签 并维护笔记-标签关联，提供标签列表、AND/OR 过滤、重命名与删除，
+// 重命名/删除时会同步改写各笔记正文中的标签文本。
 import { nanoid } from 'nanoid'
 import type { MainContext, MainModule } from '@main/bootstrap/types'
 import type { TagDTO, TagFilterMode, TagFilterResult } from '@shared/contracts/tag'
@@ -63,6 +65,7 @@ class TagRepository {
       .map((row) => row.note_id)
   }
 
+  // AND 模式用 HAVING 去重计数 = 标签数实现“同时含全部标签”；OR 模式取并集
   filter(names: string[], mode: TagFilterMode): string[] {
     if (names.length === 0) return []
     const placeholders = names.map(() => '?').join(', ')
@@ -86,6 +89,7 @@ class TagRepository {
       .map((row) => row.note_id)
   }
 
+  // 重命名撞上已有标签时：把旧标签的关联迁移到目标标签（OR IGNORE 去重）后删除旧标签
   merge(oldId: string, newId: string): void {
     this.db
       .prepare(
@@ -111,11 +115,13 @@ class TagRepository {
     this.db.prepare('DELETE FROM note_tags WHERE note_id = ?').run(noteId)
   }
 
+  // 清理不再被任何笔记引用的孤儿标签
   cleanup(): void {
     this.db.prepare('DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM note_tags)').run()
   }
 }
 
+// 去掉前导 #、空白转连字符；拒绝含 # [ ] 或换行的名字，避免破坏 Markdown 语法
 const sanitizeTagName = (value: string): string => {
   const cleaned = value.trim().replace(/^#/, '').replace(/\s+/g, '-')
   if (!cleaned || /[#[\]\n]/.test(cleaned)) throw new AppError('INVALID_REQUEST', '标签名无效')
@@ -132,6 +138,7 @@ export class TagService {
     return this.repository
   }
 
+  // 索引时全量重建本笔记的标签关联（提取规则见 extractTags），事务内先清后建并清理孤儿标签
   sync(noteId: NoteId, markdown: string): void {
     const repository = this.repo()
     const tags = [...new Set(extractTags(markdown))]
@@ -153,6 +160,8 @@ export class TagService {
     return { notes: await this.ctx.services.note.getMany(ids.map((id) => asNoteId(id))) }
   }
 
+  // 先改写所有关联笔记正文中的 #标签（保存会触发重索引），再合并或改名标签记录，
+  // 保证磁盘文本与标签索引最终一致
   async rename(oldName: string, newName: string): Promise<TagDTO> {
     const repository = this.repo()
     const oldRow = repository.byName(oldName)
@@ -179,6 +188,7 @@ export class TagService {
     }
   }
 
+  // 先从各笔记正文移除该标签文本，再删除标签记录与关联
   async delete(name: string): Promise<void> {
     const repository = this.repo()
     const row = repository.byName(name)
