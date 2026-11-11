@@ -258,13 +258,13 @@ function tablePosFromSelection(instance: Editor): number | null {
   return null
 }
 
-function syncTableToolbar(): void {
+function syncTableToolbar(forcePos?: number): void {
   const instance = editor.value
   if (!instance || ctx.workspace.sourceMode) {
     tableToolbar.value = null
     return
   }
-  const pos = tablePosFromSelection(instance)
+  const pos = forcePos ?? tablePosFromSelection(instance)
   if (pos === null) {
     tableToolbar.value = null
     return
@@ -474,6 +474,7 @@ function selectBlock(pos: number): void {
   if (!doc.nodeAt(pos)) return
   instance.view.dispatch(instance.state.tr.setSelection(NodeSelection.create(doc, pos)))
   instance.view.focus()
+  syncTableToolbar(pos)
 }
 
 function onHandleClick(): void {
