@@ -245,23 +245,36 @@ function tableAlignOf(table: PMNode): TableAlign {
   return value === 'center' || value === 'right' ? value : 'left'
 }
 
+function tablePosFromSelection(instance: Editor): number | null {
+  const selection = instance.state.selection
+  if (selection instanceof NodeSelection) {
+    const node = instance.state.doc.nodeAt(selection.from)
+    return node?.type.name === 'table' ? selection.from : null
+  }
+  const $from = selection.$from
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    if ($from.node(depth).type.name === 'table') return $from.before(depth)
+  }
+  return null
+}
+
 function syncTableToolbar(): void {
   const instance = editor.value
   if (!instance || ctx.workspace.sourceMode) {
     tableToolbar.value = null
     return
   }
-  const selection = instance.state.selection
-  if (!(selection instanceof NodeSelection)) {
+  const pos = tablePosFromSelection(instance)
+  if (pos === null) {
     tableToolbar.value = null
     return
   }
-  const table = instance.state.doc.nodeAt(selection.from)
+  const table = instance.state.doc.nodeAt(pos)
   if (!table || table.type.name !== 'table') {
     tableToolbar.value = null
     return
   }
-  const dom = instance.view.nodeDOM(selection.from)
+  const dom = instance.view.nodeDOM(pos)
   if (!(dom instanceof HTMLElement)) {
     tableToolbar.value = null
     return
@@ -279,7 +292,7 @@ function syncTableToolbar(): void {
     Math.max(48, rect.top - TABLE_TOOLBAR_HEIGHT - 4),
     Math.max(48, window.innerHeight - TABLE_TOOLBAR_HEIGHT - 8)
   )
-  tableToolbar.value = { pos: selection.from, left, top, align: tableAlignOf(table) }
+  tableToolbar.value = { pos, left, top, align: tableAlignOf(table) }
 }
 
 function applyTableAlignment(align: TableAlign): void {
